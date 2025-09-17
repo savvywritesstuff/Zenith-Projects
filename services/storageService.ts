@@ -1,7 +1,6 @@
-import { Project, User } from '../types';
+import { Project } from '../types';
 
-const getProjectsCookieKey = (userId: string) => `zenithProjectsData_${userId}`;
-const USER_STORAGE_KEY = 'zenithCurrentUser';
+const PROJECTS_COOKIE_KEY = 'zenithProjectsData';
 
 // Helper function to set a cookie
 function setCookie(name: string, value: string, days: number) {
@@ -27,55 +26,32 @@ function getCookie(name: string): string | null {
     return null;
 }
 
-// --- User Session Management ---
-export const saveUserToStorage = (user: User) => {
-    try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    } catch (error) {
-        console.error("Failed to save user session:", error);
-    }
-};
-
-export const loadUserFromStorage = (): User | null => {
-    try {
-        const userJson = localStorage.getItem(USER_STORAGE_KEY);
-        return userJson ? JSON.parse(userJson) : null;
-    } catch (error) {
-        console.error("Failed to load user session:", error);
-        return null;
-    }
-};
-
-export const clearUserFromStorage = () => {
-    localStorage.removeItem(USER_STORAGE_KEY);
-};
-
-// --- Project Data Management ---
 /**
- * Saves the list of projects for a specific user to a browser cookie.
- * @param userId The ID of the user.
+ * Saves the entire list of projects to a browser cookie.
  * @param projects The array of projects to save.
  */
-export const saveProjectsForUser = (userId: string, projects: Project[]) => {
+export const saveProjectsToCookie = (projects: Project[]) => {
     try {
         const projectsJson = JSON.stringify(projects);
-        setCookie(getProjectsCookieKey(userId), projectsJson, 365);
+        // Set cookie to expire in one year
+        setCookie(PROJECTS_COOKIE_KEY, projectsJson, 365);
     } catch (error) {
         console.error("Failed to save projects to cookie:", error);
+        // This might happen if the projects data is too large for a cookie.
         alert("Error: Could not save project data. The data might be too large for browser cookies.");
     }
 };
 
 /**
- * Loads the list of projects for a specific user from a browser cookie.
- * @param userId The ID of the user.
+ * Loads the list of projects from a browser cookie.
  * @returns An array of projects, or null if no valid data is found.
  */
-export const loadProjectsForUser = (userId: string): Project[] | null => {
+export const loadProjectsFromCookie = (): Project[] | null => {
     try {
-        const projectsJson = getCookie(getProjectsCookieKey(userId));
+        const projectsJson = getCookie(PROJECTS_COOKIE_KEY);
         if (projectsJson) {
             const projects = JSON.parse(projectsJson);
+            // Perform a basic check to ensure the data is in the expected format
             if (Array.isArray(projects)) {
                 return projects;
             }
@@ -83,6 +59,7 @@ export const loadProjectsForUser = (userId: string): Project[] | null => {
         return null;
     } catch (error) {
         console.error("Failed to load projects from cookie:", error);
+        // If there's an error (e.g., corrupted data), return null to load defaults
         return null;
     }
 };
