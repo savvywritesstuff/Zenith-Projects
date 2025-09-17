@@ -189,6 +189,7 @@ export const getTutorialProject = (): Project => {
         isArchived: false,
         folderId: null,
         labelIds: [],
+        completionNotified: false,
     };
 };
 

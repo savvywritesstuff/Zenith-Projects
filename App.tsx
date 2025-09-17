@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import JSZip from 'jszip';
 import { GiGearHammer } from 'react-icons/gi';
 import { CiStickyNote } from 'react-icons/ci';
@@ -9,7 +9,7 @@ import { KanbanBoard } from './components/Kanban';
 import { EditableDocumentPanel, implementationPlanHelpText } from './components/Documents';
 import CommentsView from './components/CommentsView';
 import Tutorial from './components/Tutorial';
-import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon } from './components/UI';
+import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon, ProjectProgressBar, FolderIcon, AddFolderIcon, GridViewIcon, ListViewIcon, CompletedStamp, Confetti, SearchIcon, FilterIcon, ChevronDownIcon, XIcon } from './components/UI';
 import { getInitialData, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
 import { AppData, saveDataToCookie, loadDataFromCookie, saveSettingsToLocalStorage, loadSettingsFromLocalStorage } from './services/storageService';
 
@@ -23,11 +23,74 @@ type DocumentType = 'planning' | 'implementation' | 'scratchpad' | 'comments';
 type EditableDocumentType = 'planning' | 'implementation' | 'scratchpad';
 
 
+// --- FILTER DROPDOWN ---
+interface FilterDropdownProps {
+    options: string[];
+    selected: string[];
+    onChange: (selected: string[]) => void;
+    placeholder: string;
+}
+const FilterDropdown: React.FC<FilterDropdownProps> = ({ options, selected, onChange, placeholder }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleToggleOption = (option: string) => {
+        const newSelected = new Set(selected);
+        if (newSelected.has(option)) {
+            newSelected.delete(option);
+        } else {
+            newSelected.add(option);
+        }
+        onChange(Array.from(newSelected));
+    };
+
+    return (
+        <div ref={dropdownRef} className="relative">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center justify-between w-40 px-3 py-1.5 bg-tertiary border border-secondary rounded-md text-sm text-primary hover:bg-hover transition-colors"
+            >
+                <span>
+                    {placeholder} {selected.length > 0 ? `(${selected.length})` : ''}
+                </span>
+                <ChevronDownIcon />
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-1 w-56 bg-secondary border border-secondary rounded-md shadow-lg z-30 p-2 max-h-60 overflow-y-auto">
+                    {options.map(option => (
+                        <label key={option} className="flex items-center gap-2 p-1.5 rounded hover:bg-hover cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={selected.includes(option)}
+                                onChange={() => handleToggleOption(option)}
+                                className="w-4 h-4 rounded bg-primary border-secondary text-accent focus:ring-accent focus:ring-offset-secondary"
+                            />
+                            <span className="text-sm text-primary">{option}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 // --- PROJECT VIEW ---
 interface ProjectViewProps {
     project: Project;
     allProjects: Project[];
     updateProject: (updatedProject: Project) => void;
+    deleteProject: (projectId: string) => void;
     selectProject: (projectId: string | null) => void;
     onTaskDrillDown: (task: Task) => void;
     isReadOnly: boolean;
@@ -49,7 +112,7 @@ const TabButton: React.FC<{ title: string; active: boolean; onClick: () => void;
     </button>
 );
 
-const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateProject, selectProject, onTaskDrillDown, isReadOnly }) => {
+const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateProject, deleteProject, selectProject, onTaskDrillDown, isReadOnly }) => {
     const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [commentingTask, setCommentingTask] = useState<Task | null>(null);
@@ -64,6 +127,49 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     const [isTutorialRunning, setIsTutorialRunning] = useState(false);
     const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
     const [confirmRemoveAllCommentsTask, setConfirmRemoveAllCommentsTask] = useState<Task | null>(null);
+    const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+    const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
+
+    // Filter states
+    const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
+    const [selectedSubPhases, setSelectedSubPhases] = useState<string[]>([]);
+    const [selectedPriorities, setSelectedPriorities] = useState<Priority[]>([]);
+
+    const allPhases = useMemo(() => [...new Set(project.tasks.map(t => t.phase))].sort(), [project.tasks]);
+    const allSubPhases = useMemo(() => [...new Set(project.tasks.map(t => t.subPhase))].sort(), [project.tasks]);
+    const allPriorities = useMemo(() => Object.values(Priority), []);
+
+    const filteredTasks = useMemo(() => {
+        return project.tasks.filter(task => {
+            const phaseMatch = selectedPhases.length === 0 || selectedPhases.includes(task.phase);
+            const subPhaseMatch = selectedSubPhases.length === 0 || selectedSubPhases.includes(task.subPhase);
+            const priorityMatch = selectedPriorities.length === 0 || selectedPriorities.includes(task.priority);
+            return phaseMatch && subPhaseMatch && priorityMatch;
+        });
+    }, [project.tasks, selectedPhases, selectedSubPhases, selectedPriorities]);
+
+    const clearFilters = () => {
+        setSelectedPhases([]);
+        setSelectedSubPhases([]);
+        setSelectedPriorities([]);
+    };
+
+    const filtersAreActive = selectedPhases.length > 0 || selectedSubPhases.length > 0 || selectedPriorities.length > 0;
+
+    useEffect(() => {
+        if (isReadOnly || project.completionNotified) return;
+
+        const totalTasks = project.tasks.length;
+        if (totalTasks === 0) return;
+
+        const doneTasks = project.tasks.filter(t => t.status === TaskStatus.Done || t.status === TaskStatus.Future).length;
+        const progress = Math.round((doneTasks / totalTasks) * 100);
+
+        if (progress === 100) {
+            setIsCompletionModalOpen(true);
+            updateProject({ ...project, completionNotified: true });
+        }
+    }, [project.tasks, project.completionNotified, isReadOnly, updateProject, project]);
 
     const tutorialSteps = useMemo<TutorialStep[]>(() => [
         {
@@ -286,6 +392,17 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
         updateProject({ ...project, comments: updatedComments });
     };
 
+    const handleRequestDeleteComment = (comment: Comment) => {
+        if (isReadOnly) return;
+        setCommentToDelete(comment);
+    };
+
+    const handleConfirmDeleteComment = () => {
+        if (!commentToDelete) return;
+        handleDeleteComment(commentToDelete.id);
+        setCommentToDelete(null);
+    };
+
     const handleConfirmRemoveAllComments = () => {
         if (isReadOnly || !confirmRemoveAllCommentsTask) return;
         const updatedComments = project.comments.filter(c => c.taskId !== confirmRemoveAllCommentsTask.id);
@@ -398,7 +515,12 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                         </div>
                         <div className="flex-grow min-h-0" data-tutorial-id="implementation-editor">
                            {activeTab === 'comments' ? (
-                                <CommentsView comments={project.comments} tasks={project.tasks} onDeleteComment={handleDeleteComment} />
+                                <CommentsView 
+                                    comments={project.comments} 
+                                    tasks={project.tasks} 
+                                    onRequestDeleteComment={handleRequestDeleteComment} 
+                                    onUpdateCommentStatus={handleUpdateCommentStatus} 
+                                />
                            ) : (
                                 <EditableDocumentPanel {...getDocumentProps(activeTab as EditableDocumentType)} />
                            )}
@@ -406,8 +528,23 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                     </div>
                 </div>
                 <div className={`flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-full pl-6' : 'w-2/3 pl-4'}`}>
+                    {!isReadOnly && (
+                        <div className="flex-shrink-0 flex items-center gap-2 p-2 mb-2 bg-secondary/70 rounded-lg border border-secondary">
+                            <FilterIcon />
+                            <span className="text-sm font-semibold text-secondary">Filter by:</span>
+                            <FilterDropdown options={allPhases} selected={selectedPhases} onChange={setSelectedPhases} placeholder="Phase" />
+                            <FilterDropdown options={allSubPhases} selected={selectedSubPhases} onChange={setSelectedSubPhases} placeholder="Sub-Phase" />
+                            <FilterDropdown options={allPriorities} selected={selectedPriorities} onChange={(p) => setSelectedPriorities(p as Priority[])} placeholder="Priority" />
+                            <div className="flex-grow" />
+                            {filtersAreActive && (
+                                <button onClick={clearFilters} className="flex items-center gap-1 text-sm text-secondary hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-hover">
+                                    <XIcon /> Clear
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <KanbanBoard
-                        tasks={project.tasks}
+                        tasks={filteredTasks}
                         project={project}
                         comments={project.comments}
                         onTaskUpdate={handleTaskUpdate}
@@ -521,6 +658,52 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
             {fullScreenTab && (
                 <EditableDocumentPanel {...getDocumentProps(fullScreenTab)} />
             )}
+             <Modal isOpen={isCompletionModalOpen} onClose={() => setIsCompletionModalOpen(false)} title="Congratulations!">
+                <Confetti />
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-primary mb-2">Project Completed!</h2>
+                    <p className="text-secondary mb-6">You've finished all tasks in "{project.name}". What's next?</p>
+                    <div className="flex justify-center gap-4">
+                        <button 
+                            onClick={() => {
+                                updateProject({ ...project, isArchived: true });
+                                selectProject(null);
+                            }}
+                            className="px-4 py-2 bg-tertiary hover:bg-hover rounded-md transition-colors"
+                        >
+                            Archive Project
+                        </button>
+                        <button 
+                            onClick={() => deleteProject(project.id)}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                        >
+                            Delete Project
+                        </button>
+                         <button 
+                            onClick={() => setIsCompletionModalOpen(false)}
+                            className="px-4 py-2 bg-accent hover:bg-accent-hover text-accent-text rounded-md transition-colors"
+                        >
+                            Keep on Dashboard
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+            <Modal isOpen={!!commentToDelete} onClose={() => setCommentToDelete(null)} title="Delete Comment?">
+                {commentToDelete && (
+                    <div className="space-y-4">
+                        <p className="text-primary">Are you sure you want to permanently delete this comment?</p>
+                        <blockquote className="border-l-4 border-secondary pl-4 text-secondary italic whitespace-pre-wrap">
+                            {commentToDelete.content}
+                        </blockquote>
+                        <div className="flex justify-end space-x-3 pt-4">
+                            <button onClick={() => setCommentToDelete(null)} className="px-4 py-2 bg-tertiary hover:bg-hover rounded-md transition-colors">Cancel</button>
+                            <button onClick={handleConfirmDeleteComment} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors">
+                               Delete
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 };
@@ -650,7 +833,7 @@ interface DashboardProps {
     onUpdateAppData: (data: Partial<AppData>) => void;
     onUpdateSettings: (settings: Partial<AppSettings>) => void;
     onSelectProject: (id: string) => void;
-    onAddProject: (name: string) => void;
+    onAddProject: (name: string, folderId: string | null) => void;
     onDeleteProject: (id: string) => void;
     onImportProject: (data: ImportData) => void;
     showTutorial: boolean;
@@ -669,14 +852,103 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [updatedProjectName, setUpdatedProjectName] = useState('');
     const [isArchiveView, setIsArchiveView] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    
+    const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
+    const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+    const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+    const [moveProjectModal, setMoveProjectModal] = useState<Project | null>(null);
+
+    const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+    const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, projectId: string) => {
+        e.dataTransfer.setData("projectId", projectId);
+        // Use timeout to allow DOM to update before hiding the original element
+        setTimeout(() => {
+            setDraggedItemId(projectId);
+        }, 0);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedItemId(null);
+        setDragOverId(null);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necessary to allow drop
+    };
+
+    const handleDragEnter = (e: React.DragEvent, id: string) => {
+        e.preventDefault();
+        if (id !== draggedItemId) {
+            setDragOverId(id);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragOverId(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, target: { type: 'folder' | 'project' | 'breadcrumb', id: string | null }) => {
+        e.preventDefault();
+        const draggedProjectId = e.dataTransfer.getData("projectId");
+        if (!draggedProjectId) return;
+
+        if (target.type === 'folder') {
+            const project = projects.find(p => p.id === draggedProjectId);
+            if (project && project.folderId !== target.id) {
+                onUpdateProject({ ...project, folderId: target.id as string });
+            }
+        } else if (target.type === 'breadcrumb') {
+            const project = projects.find(p => p.id === draggedProjectId);
+            if (project && project.folderId !== null) {
+                onUpdateProject({ ...project, folderId: null });
+            }
+        } else if (target.type === 'project') {
+            if (draggedProjectId === target.id) return;
+
+            const newProjects = [...projects];
+            const draggedIdx = newProjects.findIndex(p => p.id === draggedProjectId);
+            const targetIdx = newProjects.findIndex(p => p.id === target.id);
+            
+            if (draggedIdx > -1 && targetIdx > -1 && newProjects[draggedIdx].folderId === newProjects[targetIdx].folderId) {
+                const [draggedItem] = newProjects.splice(draggedIdx, 1);
+                newProjects.splice(targetIdx, 0, draggedItem);
+                onUpdateAppData({ projects: newProjects });
+            }
+        }
+
+        handleDragEnd(); // Reset state
+    };
 
 
     const handleAddProject = () => {
         if (newProjectName.trim()) {
-            onAddProject(newProjectName.trim());
+            onAddProject(newProjectName.trim(), currentFolderId);
             setNewProjectName('');
             setShowAddModal(false);
         }
+    };
+    
+    const handleAddFolder = () => {
+        if (newFolderName.trim()) {
+            const newFolder: Folder = {
+                id: `folder-${Date.now()}`,
+                name: newFolderName.trim(),
+            };
+            onUpdateAppData({ folders: [...folders, newFolder] });
+            setNewFolderName('');
+            setIsAddFolderModalOpen(false);
+        }
+    };
+
+    const handleMoveProject = (targetFolderId: string | null) => {
+        if (!moveProjectModal) return;
+        onUpdateProject({ ...moveProjectModal, folderId: targetFolderId });
+        setMoveProjectModal(null);
     };
 
     const handleContextMenu = (e: React.MouseEvent, project: Project) => {
@@ -711,18 +983,36 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
     });
 
     const archivedProjects = projects.filter(p => p.isArchived);
+    const currentFolder = folders.find(f => f.id === currentFolderId);
 
-    const projectsToDisplay = isArchiveView ? archivedProjects : mainProjects;
+    const projectsInCurrentView = mainProjects
+        .filter(p => currentFolderId ? p.folderId === currentFolderId : !p.folderId)
+        .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const projectsToDisplay = isArchiveView 
+        ? archivedProjects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        : projectsInCurrentView;
 
+    const foldersToDisplay = isArchiveView || currentFolderId 
+        ? [] 
+        : folders.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
         <div className="min-h-screen bg-primary flex flex-col items-center p-8">
-            <header className="w-full max-w-4xl mb-10">
-                <div className="flex justify-between items-center">
+            <header className="w-full max-w-5xl mb-10">
+                <div className="flex justify-between items-center mb-4">
                     <h1 className="text-5xl font-bold special-text-gradient">
-                        {isArchiveView ? "Archived Projects" : "Zenith Projects"}
+                        {isArchiveView ? "Archived Projects" : (currentFolder ? currentFolder.name : "Zenith Projects")}
                     </h1>
-                    <div className="flex items-center gap-4 text-secondary">
+                    <div className="flex items-center gap-2 text-secondary">
+                        <button onClick={() => setViewType(viewType === 'grid' ? 'list' : 'grid')} title="Toggle View" className="p-2 hover:text-primary transition-colors">
+                            {viewType === 'grid' ? <ListViewIcon /> : <GridViewIcon />}
+                        </button>
+                        {!isArchiveView && (
+                            <button onClick={() => setIsAddFolderModalOpen(true)} title="New Folder" className="p-2 hover:text-primary transition-colors">
+                               <AddFolderIcon />
+                            </button>
+                        )}
                         {!isArchiveView && (
                              <label className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors">
                                 <input
@@ -734,63 +1024,149 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
                                 Show Tutorial
                             </label>
                         )}
-                         <button onClick={() => setIsArchiveView(!isArchiveView)} title={isArchiveView ? "View Active Projects" : "View Archive"} className="hover:text-primary transition-colors">
+                         <button onClick={() => setIsArchiveView(!isArchiveView)} title={isArchiveView ? "View Active Projects" : "View Archive"} className="p-2 hover:text-primary transition-colors">
                            <ArchiveIcon />
                         </button>
-                        <button onClick={() => setIsBackupModalOpen(true)} title="Backup All Projects" className="hover:text-primary transition-colors">
+                        <button onClick={() => setIsBackupModalOpen(true)} title="Backup All Projects" className="p-2 hover:text-primary transition-colors">
                             <BackupAllIcon />
                         </button>
-                        <button onClick={() => setIsImportModalOpen(true)} title="Import Project" className="hover:text-primary transition-colors">
+                        <button onClick={() => setIsImportModalOpen(true)} title="Import Project" className="p-2 hover:text-primary transition-colors">
                            <UploadIcon />
                         </button>
-                        <button onClick={() => setIsSettingsModalOpen(true)} title="Settings" className="hover:text-primary transition-colors">
+                        <button onClick={() => setIsSettingsModalOpen(true)} title="Settings" className="p-2 hover:text-primary transition-colors">
                            <SettingsIcon />
                         </button>
-                        <button onClick={() => setIsHelpOpen(true)} title="Help" className="hover:text-primary transition-colors">
+                        <button onClick={() => setIsHelpOpen(true)} title="Help" className="p-2 hover:text-primary transition-colors">
                            <HelpIcon />
                         </button>
                     </div>
                 </div>
+                 <div className="flex justify-between items-center mt-4">
+                    {!isArchiveView ? (
+                        <div className="flex items-center gap-2 text-sm text-secondary">
+                            <button 
+                                onClick={() => setCurrentFolderId(null)} 
+                                className={`transition-colors ${!currentFolderId ? 'font-bold text-primary' : 'hover:underline'} ${dragOverId === 'breadcrumb-root' ? 'text-accent underline' : ''}`}
+                                onDrop={(e) => handleDrop(e, { type: 'breadcrumb', id: null })}
+                                onDragOver={handleDragOver}
+                                onDragEnter={(e) => handleDragEnter(e, 'breadcrumb-root')}
+                                onDragLeave={handleDragLeave}
+                            >Projects</button>
+                            {currentFolder && (
+                                <>
+                                    <span>/</span>
+                                    <span className="font-bold text-primary">{currentFolder.name}</span>
+                                </>
+                            )}
+                        </div>
+                    ) : <div />}
+                    <div className="relative w-full max-w-xs">
+                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <SearchIcon />
+                        </div>
+                        <input
+                            type="search"
+                            placeholder="Search projects..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-secondary border border-secondary rounded-md py-2 pl-10 pr-4 focus:ring-2 focus:ring-accent outline-none"
+                        />
+                    </div>
+                 </div>
             </header>
-            <div className="w-full max-w-4xl">
-                 {projectsToDisplay.length === 0 && !isArchiveView && (
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="w-full border-2 border-dashed border-secondary rounded-lg flex flex-col items-center justify-center p-10 text-secondary hover:border-accent hover:text-accent transition-colors"
-                    >
-                        <PlusIcon />
-                        <span className="mt-2 font-semibold">Create Your First Project</span>
-                    </button>
+            <main className="w-full max-w-5xl">
+                 {projectsToDisplay.length === 0 && foldersToDisplay.length === 0 && !isArchiveView && (
+                    <div className="text-center p-10">
+                         <h2 className="text-xl font-semibold text-secondary">{searchQuery ? 'No projects or folders match your search.' : 'This folder is empty.'}</h2>
+                         {!searchQuery && (
+                            <button
+                                onClick={() => setShowAddModal(true)}
+                                className="mt-4 px-4 py-2 bg-accent hover:bg-accent-hover text-accent-text rounded-md transition-colors"
+                            >
+                                Create a Project
+                            </button>
+                         )}
+                    </div>
                 )}
                  {projectsToDisplay.length === 0 && isArchiveView && (
                     <div className="w-full text-center p-10 text-secondary">
-                        <p>No archived projects found.</p>
-                        <p className="text-sm">You can archive a project by right-clicking it on the main dashboard.</p>
+                        <p>{searchQuery ? 'No archived projects match your search.' : 'No archived projects found.'}</p>
+                        {!searchQuery && <p className="text-sm">You can archive a project by right-clicking it on the main dashboard.</p>}
                     </div>
                 )}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {projectsToDisplay.map(project => (
-                        <div 
-                            key={project.id} 
-                            onClick={() => onSelectProject(project.id)}
-                            onContextMenu={(e) => handleContextMenu(e, project)}
-                            className="bg-secondary rounded-lg p-5 group relative border border-secondary hover:border-accent transition-all duration-300 cursor-pointer"
-                        >
-                            <h2 className="text-xl font-bold text-primary truncate">{project.name}</h2>
-                            <p className="text-secondary mt-2">{project.tasks.length} tasks</p>
-                        </div>
-                    ))}
-                    {!isArchiveView && (
+                <div className={viewType === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "flex flex-col gap-4"}>
+                    {foldersToDisplay.map(folder => {
+                        const baseClasses = "bg-secondary/70 rounded-lg group relative border hover:border-accent transition-all duration-300 cursor-pointer flex items-center";
+                        const gridClasses = "p-5 gap-3";
+                        const listClasses = "p-4 justify-between";
+                        const dragOverClasses = dragOverId === folder.id ? "border-accent ring-2 ring-accent" : "border-secondary";
+                        return (
+                            <div
+                                key={folder.id}
+                                onClick={() => setCurrentFolderId(folder.id)}
+                                className={`${baseClasses} ${viewType === 'grid' ? gridClasses : listClasses} ${dragOverClasses}`}
+                                onDrop={(e) => handleDrop(e, { type: 'folder', id: folder.id })}
+                                onDragOver={handleDragOver}
+                                onDragEnter={(e) => handleDragEnter(e, folder.id)}
+                                onDragLeave={handleDragLeave}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <FolderIcon />
+                                    <h2 className="text-xl font-bold text-primary truncate">{folder.name}</h2>
+                                </div>
+                            </div>
+                        )
+                    })}
+                    {projectsToDisplay.map(project => {
+                        const totalTasks = project.tasks.length;
+                        const doneTasks = project.tasks.filter(t => t.status === TaskStatus.Done || t.status === TaskStatus.Future).length;
+                        const isCompleted = totalTasks > 0 && doneTasks === totalTasks;
+                        const isBeingDragged = draggedItemId === project.id;
+                        const isDragOver = dragOverId === project.id;
+                        const baseClasses = "bg-secondary rounded-lg group relative border hover:border-accent transition-all duration-300 cursor-pointer";
+                        const gridClasses = "p-5";
+                        const listClasses = "p-4 flex items-center justify-between";
+                        const stateClasses = `${isBeingDragged ? 'opacity-30' : ''} ${isDragOver ? 'border-accent ring-2 ring-accent' : 'border-secondary'}`;
+                        
+                        return (
+                            <div 
+                                key={project.id} 
+                                draggable={!isArchiveView}
+                                onDragStart={(e) => handleDragStart(e, project.id)}
+                                onDragEnd={handleDragEnd}
+                                onDrop={(e) => handleDrop(e, { type: 'project', id: project.id })}
+                                onDragOver={handleDragOver}
+                                onDragEnter={(e) => handleDragEnter(e, project.id)}
+                                onDragLeave={handleDragLeave}
+                                onClick={() => onSelectProject(project.id)}
+                                onContextMenu={(e) => handleContextMenu(e, project)}
+                                className={`${baseClasses} ${viewType === 'grid' ? gridClasses : listClasses} ${stateClasses}`}
+                            >
+                                <div>
+                                    <h2 className="text-xl font-bold text-primary truncate">{project.name}</h2>
+                                    <p className="text-secondary text-sm mt-1">{project.tasks.length} tasks</p>
+                                </div>
+                                <div className={viewType === 'grid' ? 'w-full' : 'w-1/3'}>
+                                   <ProjectProgressBar tasks={project.tasks} />
+                                </div>
+                                {isCompleted && <CompletedStamp />}
+                            </div>
+                        )
+                    })}
+                    {!isArchiveView && searchQuery.length === 0 && (
                          <button
                             onClick={() => setShowAddModal(true)}
-                            className="border-2 border-dashed border-secondary rounded-lg flex flex-col items-center justify-center p-5 text-secondary hover:border-accent hover:text-accent transition-colors"
+                            className={viewType === 'grid' 
+                                ? "border-2 border-dashed border-secondary rounded-lg flex flex-col items-center justify-center p-5 text-secondary hover:border-accent hover:text-accent transition-colors min-h-[140px]"
+                                : "border-2 border-dashed border-secondary rounded-lg flex items-center justify-center p-4 text-secondary hover:border-accent hover:text-accent transition-colors"
+                            }
                         >
                             <PlusIcon />
-                            <span className="mt-2 font-semibold">New Project</span>
+                            <span className="ml-2 font-semibold">New Project</span>
                         </button>
                     )}
                 </div>
-            </div>
+            </main>
             <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Create New Project">
                 <div className="space-y-4">
                     <input
@@ -807,6 +1183,24 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
                     <div className="flex justify-end">
                         <button onClick={handleAddProject} className="px-4 py-2 bg-accent hover:bg-accent-hover text-accent-text rounded-md transition-colors">
                             Create
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+             <Modal isOpen={isAddFolderModalOpen} onClose={() => setIsAddFolderModalOpen(false)} title="Create New Folder">
+                 <div className="space-y-4">
+                    <input
+                        type="text"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddFolder(); }}
+                        placeholder="Folder Name"
+                        className="w-full bg-primary border border-secondary rounded-md p-2 focus:ring-2 focus:ring-accent outline-none"
+                        autoFocus
+                    />
+                    <div className="flex justify-end">
+                        <button onClick={handleAddFolder} className="px-4 py-2 bg-accent hover:bg-accent-hover text-accent-text rounded-md transition-colors">
+                            Create Folder
                         </button>
                     </div>
                 </div>
@@ -898,6 +1292,17 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
                     >
                         <EditIcon /> Rename
                     </button>
+                     {!isArchiveView && (
+                        <button
+                            onClick={() => {
+                                setMoveProjectModal(contextMenu.project);
+                                setContextMenu(null);
+                            }}
+                            className="flex items-center w-full text-left px-4 py-2 text-sm text-primary hover:bg-hover"
+                        >
+                            <FolderIcon /> Move...
+                        </button>
+                    )}
                     {isArchiveView ? (
                          <button
                             onClick={() => handleRestoreProject(contextMenu.project)}
@@ -951,6 +1356,27 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
                             Save
                         </button>
                     </div>
+                </div>
+            </Modal>
+             <Modal isOpen={!!moveProjectModal} onClose={() => setMoveProjectModal(null)} title={`Move "${moveProjectModal?.name}" to...`}>
+                <div className="flex flex-col gap-2">
+                    <button
+                        onClick={() => handleMoveProject(null)}
+                        className="w-full text-left px-4 py-3 text-sm text-primary bg-tertiary rounded-md hover:bg-hover transition-colors"
+                    >
+                        / (Root Folder)
+                    </button>
+                    {folders
+                        .filter(folder => folder.id !== moveProjectModal?.folderId)
+                        .map(folder => (
+                        <button
+                            key={folder.id}
+                            onClick={() => handleMoveProject(folder.id)}
+                            className="w-full text-left px-4 py-3 text-sm text-primary bg-tertiary rounded-md hover:bg-hover transition-colors"
+                        >
+                           {folder.name}
+                        </button>
+                    ))}
                 </div>
             </Modal>
         </div>
@@ -1122,7 +1548,7 @@ const App: React.FC = () => {
         updateAppData({ projects: projects.map(p => p.id === updatedProject.id ? updatedProject : p) });
     };
     
-    const handleAddProject = (name: string) => {
+    const handleAddProject = (name: string, folderId: string | null) => {
         const newProjectId = `proj-${Date.now()}`;
         const newProject: Project = {
             id: newProjectId,
@@ -1138,7 +1564,7 @@ const App: React.FC = () => {
             phaseColors: {},
             subPhaseColors: {},
             isArchived: false,
-            folderId: null,
+            folderId,
             labelIds: [],
         };
         const newTasks = parseImplementationPlan(newProject.implementationPlan);
@@ -1157,6 +1583,7 @@ const App: React.FC = () => {
             return;
         }
         updateAppData({ projects: projects.filter(p => p.id !== id) });
+        setActiveProjectId(null);
     };
 
     const handleImportProject = (data: ImportData) => {
@@ -1260,6 +1687,7 @@ const App: React.FC = () => {
             project={activeProject} 
             allProjects={projects} 
             updateProject={handleUpdateProject} 
+            deleteProject={handleDeleteProject}
             selectProject={setActiveProjectId}
             onTaskDrillDown={(task) => handleTaskDrillDown(task, activeProject.id)}
             isReadOnly={!!activeProject.isArchived}

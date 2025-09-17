@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { Task, TaskStatus, Priority } from '../types';
 import { HiQuestionMarkCircle } from 'react-icons/hi2';
-import { RiArchiveLine, RiUploadCloud2Line, RiSettings3Line, RiChat1Line, RiChatNewLine, RiInboxUnarchiveLine, RiSave3Line, RiFolderLine, RiFolderAddLine, RiPriceTag3Line, RiChat3Line, RiCheckLine, RiCloseLine, RiArrowLeftSLine, RiArrowRightSLine, RiChatDeleteLine } from 'react-icons/ri';
+import { RiArchiveLine, RiUploadCloud2Line, RiSettings3Line, RiChat1Line, RiChatNewLine, RiInboxUnarchiveLine, RiSave3Line, RiFolderLine, RiFolderAddLine, RiPriceTag3Line, RiChat3Line, RiCheckLine, RiCloseLine, RiArrowLeftSLine, RiArrowRightSLine, RiChatDeleteLine, RiLayoutGridLine, RiListUnordered, RiDeleteBinLine, RiSearchLine, RiFilter3Line, RiArrowDownSLine } from 'react-icons/ri';
 
 // --- ICONS ---
 export const PlusIcon = () => (
@@ -11,9 +11,7 @@ export const PlusIcon = () => (
 );
 
 export const TrashIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-    </svg>
+    <RiDeleteBinLine className="h-5 w-5" />
 );
 
 export const ArchiveIcon = () => (
@@ -79,8 +77,14 @@ export const HelpIcon = () => (
 export const RestoreIcon = () => <RiInboxUnarchiveLine className="h-5 w-5 mr-2" />;
 export const BackupAllIcon = () => <RiSave3Line className="h-6 w-6" />;
 export const FolderIcon = () => <RiFolderLine className="h-5 w-5 mr-2" />;
-export const AddFolderIcon = () => <RiFolderAddLine className="h-5 w-5 mr-2" />;
+export const AddFolderIcon = () => <RiFolderAddLine className="h-6 w-6" />;
 export const LabelIcon = () => <RiPriceTag3Line className="h-5 w-5 mr-2" />;
+export const GridViewIcon = () => <RiLayoutGridLine className="h-6 w-6" />;
+export const ListViewIcon = () => <RiListUnordered className="h-6 w-6" />;
+export const SearchIcon = () => <RiSearchLine className="h-5 w-5" />;
+export const FilterIcon = () => <RiFilter3Line className="h-5 w-5" />;
+export const ChevronDownIcon = () => <RiArrowDownSLine className="h-5 w-5" />;
+
 
 // Comment-related icons
 export const CommentIndicatorIcon = () => <RiChat3Line className="w-3 h-3" />;
@@ -111,6 +115,56 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ tasks }) => {
       </span>
     </div>
   );
+};
+
+// --- DASHBOARD PROGRESS BAR ---
+interface ProjectProgressBarProps {
+  tasks: Task[];
+}
+export const ProjectProgressBar: React.FC<ProjectProgressBarProps> = ({ tasks }) => {
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter(t => t.status === TaskStatus.Done || t.status === TaskStatus.Future).length;
+  const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+  return (
+    <div className="w-full bg-tertiary rounded-full h-2 mt-3 relative group" title={`${doneTasks}/${totalTasks} tasks complete`}>
+      <div
+        className="bg-accent h-2 rounded-full transition-all duration-500 ease-out"
+        style={{ width: `${progress}%` }}
+      ></div>
+    </div>
+  );
+};
+
+
+// --- COMPLETED STAMP ---
+export const CompletedStamp: React.FC = () => (
+    <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg pointer-events-none">
+        <span className="text-white font-bold text-2xl tracking-widest uppercase transform -rotate-12 border-4 border-white px-4 py-2">
+            Completed
+        </span>
+    </div>
+);
+
+
+// --- CONFETTI ---
+const CONFETTI_COLORS = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+
+export const Confetti: React.FC = () => {
+    const confettiCount = 100;
+    const pieces = useMemo(() => {
+        return Array.from({ length: confettiCount }).map((_, i) => {
+            const style = {
+                left: `${Math.random() * 100}%`,
+                backgroundColor: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${3 + Math.random() * 2}s`,
+            };
+            return <div key={i} className="confetti-piece" style={style} />;
+        });
+    }, []);
+
+    return <div className="absolute inset-0 pointer-events-none overflow-hidden z-[60]">{pieces}</div>;
 };
 
 
@@ -204,7 +258,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
           <h3 className="text-xl font-semibold text-primary">{title}</h3>
           <button onClick={onClose} className="text-secondary hover:text-primary transition-colors">&times;</button>
         </div>
-        <div className="p-6">
+        <div className="p-6 relative">
           {children}
         </div>
       </div>

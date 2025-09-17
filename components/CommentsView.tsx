@@ -1,11 +1,12 @@
 import React from 'react';
 import { Comment, Task, CommentStatus } from '../types';
-import { TrashIcon } from './UI';
+import { TrashIcon, CheckIcon } from './UI';
 
 interface CommentsViewProps {
     comments: Comment[];
     tasks: Task[];
-    onDeleteComment: (commentId: string) => void;
+    onRequestDeleteComment: (comment: Comment) => void;
+    onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
 }
 
 const getStatusClass = (status: CommentStatus) => {
@@ -17,7 +18,7 @@ const getStatusClass = (status: CommentStatus) => {
   }
 }
 
-const CommentsView: React.FC<CommentsViewProps> = ({ comments, tasks, onDeleteComment }) => {
+const CommentsView: React.FC<CommentsViewProps> = ({ comments, tasks, onRequestDeleteComment, onUpdateCommentStatus }) => {
     
     const sortedComments = [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -49,13 +50,18 @@ const CommentsView: React.FC<CommentsViewProps> = ({ comments, tasks, onDeleteCo
                                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusClass(comment.status)}`}>
                                             {comment.status}
                                         </span>
+                                        {comment.status === CommentStatus.Active && (
+                                            <button
+                                                onClick={() => onUpdateCommentStatus(comment.id, CommentStatus.Resolved)}
+                                                className="text-green-400 hover:text-green-300 transition-colors"
+                                                title="Resolve Comment"
+                                            >
+                                                <CheckIcon />
+                                            </button>
+                                        )}
                                     </div>
                                     <button
-                                        onClick={() => {
-                                            if (window.confirm('Are you sure you want to delete this comment?')) {
-                                                onDeleteComment(comment.id);
-                                            }
-                                        }}
+                                        onClick={() => onRequestDeleteComment(comment)}
                                         className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
                                         title="Delete Comment"
                                     >

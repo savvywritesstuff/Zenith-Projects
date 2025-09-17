@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { KANBAN_COLUMNS } from '../constants';
 import { Task, TaskStatus, Priority, Project, Comment, CommentStatus } from '../types';
 import { CommentIndicatorIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon, XIcon } from './UI';
@@ -39,26 +39,40 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
     background: `linear-gradient(135deg, ${phaseColor} 50%, ${subPhaseColor} 50%)`,
   };
 
-  const [isPopoverVisible, setIsPopoverVisible] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState<{ x: number, y: number } | null>(null);
   const [currentCommentIndex, setCurrentCommentIndex] = useState(0);
+  const popoverTimeoutRef = useRef<number | null>(null);
 
   const activeComments = useMemo(() => comments.filter(c => c.status === CommentStatus.Active), [comments]);
   
-  const handleMouseEnter = () => {
-    if (activeComments.length > 0) setIsPopoverVisible(true);
-  };
-  const handleMouseLeave = () => {
-    setIsPopoverVisible(false);
-    setCurrentCommentIndex(0);
+  const clearHideTimeout = () => {
+    if (popoverTimeoutRef.current) {
+      clearTimeout(popoverTimeoutRef.current);
+      popoverTimeoutRef.current = null;
+    }
   };
 
+  const handleCommentIconMouseEnter = (e: React.MouseEvent) => {
+    if (activeComments.length > 0) {
+      clearHideTimeout();
+      setPopoverPosition({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handlePopoverAreaMouseLeave = () => {
+    popoverTimeoutRef.current = window.setTimeout(() => {
+      setPopoverPosition(null);
+      setCurrentCommentIndex(0);
+    }, 300);
+  };
+  
   const currentComment = activeComments[currentCommentIndex];
 
   return (
     <div
       className="relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseLeave={handlePopoverAreaMouseLeave}
+      onMouseEnter={clearHideTimeout}
     >
       <div
         draggable
@@ -80,7 +94,10 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
           <div className="mt-3 flex justify-between items-center">
             <PriorityTag priority={task.priority} />
              {activeComments.length > 0 && (
-                <div className="flex items-center gap-1 bg-tertiary px-1.5 py-0.5 rounded-full text-xs text-secondary">
+                <div 
+                  className="flex items-center gap-1 bg-tertiary px-1.5 py-0.5 rounded-full text-xs text-secondary"
+                  onMouseEnter={handleCommentIconMouseEnter}
+                >
                     <CommentIndicatorIcon />
                     <span>{activeComments.length}</span>
                 </div>
@@ -89,9 +106,15 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
         </div>
       </div>
 
-       {isPopoverVisible && currentComment && (
-        <div className="absolute bottom-full w-full left-0 p-1 z-10">
-          <div className="bg-tertiary rounded-md shadow-xl p-2 animate-fade-in-up border border-secondary">
+       {popoverPosition && currentComment && (
+        <div 
+          className="fixed w-72 bg-tertiary rounded-md shadow-xl p-2 z-50 animate-fade-in-up border border-secondary"
+          style={{ 
+            top: popoverPosition.y + 15, 
+            left: popoverPosition.x + 15 
+          }}
+          onMouseEnter={clearHideTimeout}
+        >
              <p className="text-sm text-primary mb-2 whitespace-pre-wrap">{currentComment.content}</p>
              <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1">
@@ -122,7 +145,6 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
                     ><XIcon /></button>
                 </div>
              </div>
-          </div>
         </div>
       )}
     </div>
@@ -164,7 +186,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, com
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-shrink-0 w-80 bg-secondary/70 rounded-lg p-3 h-full flex flex-col transition-all duration-300 ${isOver ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
+      className={`flex-shrink-0 w-64 bg-secondary/70 rounded-lg p-3 h-full flex flex-col transition-all duration-300 ${isOver ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
     >
       <h3 className="font-bold text-lg mb-4 px-1 flex items-center text-primary">
         {status}

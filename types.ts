@@ -96,6 +96,7 @@ export interface Project {
   folderId?: string | null; // null for root
   labelIds?: string[];
   isArchived?: boolean;
+  completionNotified?: boolean;
 }
 
 
