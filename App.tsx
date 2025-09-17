@@ -8,6 +8,7 @@ import { EditableDocumentPanel, implementationPlanHelpText } from './components/
 import Tutorial from './components/Tutorial';
 import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation } from './components/UI';
 import { getInitialProjects, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
+import { saveProjectsToCookie, loadProjectsFromCookie } from './services/storageService';
 
 type ContextMenuState = {
     x: number;
@@ -440,12 +441,18 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddP
 
 // --- APP ---
 const App: React.FC = () => {
-    const [projects, setProjects] = useState<Project[]>(getInitialProjects());
+    const [projects, setProjects] = useState<Project[]>(() => {
+        return loadProjectsFromCookie() || getInitialProjects();
+    });
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const [showTutorial, setShowTutorial] = useState(() => {
         const saved = localStorage.getItem('showTutorial');
         return saved !== null ? JSON.parse(saved) : true;
     });
+
+    useEffect(() => {
+        saveProjectsToCookie(projects);
+    }, [projects]);
 
     useEffect(() => {
         localStorage.setItem('showTutorial', JSON.stringify(showTutorial));
