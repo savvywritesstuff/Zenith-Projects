@@ -3,25 +3,113 @@ import JSZip from 'jszip';
 import { GiGearHammer } from 'react-icons/gi';
 import { CiStickyNote } from 'react-icons/ci';
 import { HiOutlineClipboardDocumentList, HiChevronDoubleLeft, HiChevronDoubleRight } from 'react-icons/hi2';
-import { Project, Task, TaskStatus, Priority, TutorialStep, Theme, THEME_OPTIONS, FontFamily, FONT_FAMILY_OPTIONS, FontSize, FONT_SIZE_OPTIONS, Comment } from './types';
+import { Project, Task, TaskStatus, Priority, TutorialStep, Theme, THEME_OPTIONS, FontFamily, FONT_FAMILY_OPTIONS, FontSize, FONT_SIZE_OPTIONS, Comment, User } from './types';
 import { KANBAN_COLUMNS } from './constants';
 import { KanbanBoard } from './components/Kanban';
 import { EditableDocumentPanel, implementationPlanHelpText } from './components/Documents';
 import CommentsView from './components/CommentsView';
 import Tutorial from './components/Tutorial';
 import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon } from './components/UI';
+import UserMenu from './components/UserMenu';
 import { getInitialProjects, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
-import { saveProjectsToCookie, loadProjectsFromCookie } from './services/storageService';
+import { saveProjectsForUser, loadProjectsForUser, saveUserToStorage, loadUserFromStorage, clearUserFromStorage } from './services/storageService';
 import { useTheme } from './hooks/useTheme';
 
-type ContextMenuState = {
-    x: number;
-    y: number;
-    content: React.ReactNode;
-} | null;
 
-type DocumentType = 'planning' | 'implementation' | 'scratchpad' | 'comments';
-type EditableDocumentType = 'planning' | 'implementation' | 'scratchpad';
+// --- TYPE DEFINITIONS ---
+// Add google to the window object for Google Identity Services
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
+// This needs to be replaced with your actual Google Client ID
+const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+
+
+// --- HELPER FUNCTIONS ---
+function decodeJwt(token: string) {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to decode JWT", e);
+    return null;
+  }
+}
+
+
+// --- LOGIN SCREEN ---
+const LoginScreen: React.FC<{ onLoginSuccess: (user: User) => void }> = ({ onLoginSuccess }) => {
+    useEffect(() => {
+        if (window.google) {
+            window.google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: (response: any) => {
+                    if (GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE_CLIENT_ID')) {
+                        alert("Please replace 'YOUR_GOOGLE_CLIENT_ID' in App.tsx with your actual Google Client ID to enable login.");
+                        return;
+                    }
+                    const userObject = decodeJwt(response.credential);
+                    if (userObject) {
+                        onLoginSuccess({
+                            id: userObject.sub,
+                            name: userObject.name,
+                            email: userObject.email,
+                            picture: userObject.picture,
+                        });
+                    }
+                },
+            });
+            window.google.accounts.id.renderButton(
+                document.getElementById("signInDiv"),
+                { theme: "outline", size: "large", type: "standard", text: "signin_with" }
+            );
+            window.google.accounts.id.prompt();
+        }
+    }, [onLoginSuccess]);
+
+    return (
+        <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-4">
+            <div className="text-center">
+                <h1 className="text-6xl font-bold special-text-gradient mb-4">
+                    Zenith
+                </h1>
+                <p className="text-xl text-secondary mb-8">Your All-in-One Project Management Hub</p>
+                <div id="signInDiv" className="flex justify-center"></div>
+                 {GOOGLE_CLIENT_ID.startsWith('YOUR_GOOGLE_CLIENT_ID') && (
+                    <p className="text-xs text-yellow-400 mt-4 max-w-sm mx-auto">
+                        <strong>Developer Note:</strong> Login is currently disabled. Please replace the placeholder Google Client ID in <code>App.tsx</code> to enable Google Sign-In.
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Fix: Define TabButton component to resolve "Cannot find name 'TabButton'" errors.
+// --- TAB BUTTON ---
+interface TabButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    title: string;
+    active: boolean;
+    children: React.ReactNode;
+}
+
+const TabButton: React.FC<TabButtonProps> = ({ children, title, active, ...props }) => (
+    <button
+        {...props}
+        title={title}
+        className={`p-2 rounded-md transition-colors w-full ${active ? 'bg-accent text-accent-text' : 'text-secondary hover:bg-hover hover:text-primary'}`}
+    >
+        {children}
+    </button>
+);
 
 
 // --- PROJECT VIEW ---
@@ -31,26 +119,12 @@ interface ProjectViewProps {
     updateProject: (updatedProject: Project) => void;
     selectProject: (projectId: string | null) => void;
     onTaskDrillDown: (task: Task) => void;
+    currentUser: User;
+    onLogout: () => void;
 }
 
-const TabButton: React.FC<{ title: string; active: boolean; onClick: () => void; children: React.ReactNode; 'data-tutorial-id'?: string }> = ({ title, active, onClick, children, ...props }) => (
-    <button 
-        onClick={onClick}
-        title={title}
-        aria-label={title}
-        className={`p-2 rounded-md flex-1 flex justify-center items-center transition-colors ${
-            active 
-            ? 'bg-accent text-accent-text' 
-            : 'text-secondary hover:bg-hover'
-        }`}
-        {...props}
-    >
-        {children}
-    </button>
-);
-
-const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateProject, selectProject, onTaskDrillDown }) => {
-    const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateProject, selectProject, onTaskDrillDown, currentUser, onLogout }) => {
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [commentingTask, setCommentingTask] = useState<Task | null>(null);
     const [newComment, setNewComment] = useState('');
@@ -159,6 +233,16 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     
 
     const handleTextSelection = (text: string) => setSelectedText(text);
+
+    type ContextMenuState = {
+        x: number;
+        y: number;
+        content: React.ReactNode;
+    } | null;
+
+    type DocumentType = 'planning' | 'implementation' | 'scratchpad' | 'comments';
+    type EditableDocumentType = 'planning' | 'implementation' | 'scratchpad';
+
 
     const handleContextMenu = (e: React.MouseEvent) => {
         if (selectedText) {
@@ -309,15 +393,18 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                             </button>
                         )}
                     </div>
-                     {parentProject ? (
-                        <button onClick={() => selectProject(parentProject.id)} className="px-4 py-2 text-sm bg-tertiary hover:bg-hover rounded-lg transition-colors">
-                            &larr; Back to Parent: {parentProject.name}
-                        </button>
-                     ) : (
-                        <button onClick={() => selectProject(null)} className="px-4 py-2 text-sm bg-tertiary hover:bg-hover rounded-lg transition-colors" data-tutorial-id="back-to-dashboard">
-                            &larr; Back to Dashboard
-                        </button>
-                     )}
+                     <div className="flex items-center gap-4">
+                        {parentProject ? (
+                            <button onClick={() => selectProject(parentProject.id)} className="px-4 py-2 text-sm bg-tertiary hover:bg-hover rounded-lg transition-colors">
+                                &larr; Back to Parent: {parentProject.name}
+                            </button>
+                        ) : (
+                            <button onClick={() => selectProject(null)} className="px-4 py-2 text-sm bg-tertiary hover:bg-hover rounded-lg transition-colors" data-tutorial-id="back-to-dashboard">
+                                &larr; Back to Dashboard
+                            </button>
+                        )}
+                        <UserMenu user={currentUser} onLogout={onLogout} />
+                    </div>
                 </div>
                 <ProgressBar tasks={project.tasks} />
             </header>
@@ -591,9 +678,11 @@ interface DashboardProps {
     onImportProject: (data: ImportData) => void;
     showTutorial: boolean;
     setShowTutorial: (show: boolean) => void;
+    currentUser: User;
+    onLogout: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddProject, onDeleteProject, onUpdateProject, onImportProject, showTutorial, setShowTutorial }) => {
+const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddProject, onDeleteProject, onUpdateProject, onImportProject, showTutorial, setShowTutorial, currentUser, onLogout }) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -677,6 +766,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddP
                         <button onClick={() => setIsHelpOpen(true)} title="Help" className="hover:text-primary transition-colors">
                            <HelpIcon />
                         </button>
+                        <UserMenu user={currentUser} onLogout={onLogout} />
                     </div>
                 </div>
             </header>
@@ -805,10 +895,9 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddP
 
 // --- APP ---
 const App: React.FC = () => {
-    const [defaultTheme, setDefaultTheme] = useTheme();
-    const [projects, setProjects] = useState<Project[]>(() => {
-        return loadProjectsFromCookie() || getInitialProjects();
-    });
+    const [defaultTheme] = useTheme();
+    const [currentUser, setCurrentUser] = useState<User | null>(() => loadUserFromStorage());
+    const [projects, setProjects] = useState<Project[]>([]);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const [showTutorial, setShowTutorial] = useState(() => {
         const saved = localStorage.getItem('showTutorial');
@@ -817,30 +906,50 @@ const App: React.FC = () => {
 
     const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
 
+     useEffect(() => {
+        if (currentUser) {
+            const userProjects = loadProjectsForUser(currentUser.id) || getInitialProjects();
+            setProjects(userProjects);
+        } else {
+            setProjects([]); // Clear projects on logout
+        }
+    }, [currentUser]);
+
     useEffect(() => {
-        saveProjectsToCookie(projects);
-    }, [projects]);
+        if (currentUser && projects.length > 0) {
+            saveProjectsForUser(currentUser.id, projects);
+        }
+    }, [projects, currentUser]);
 
     useEffect(() => {
         localStorage.setItem('showTutorial', JSON.stringify(showTutorial));
     }, [showTutorial]);
 
     useEffect(() => {
-        // This effect ensures the correct theme and appearance settings are applied
-        // when switching between the dashboard and a project view.
         const root = document.documentElement;
         if (activeProject) {
             root.setAttribute('data-theme', activeProject.theme || defaultTheme);
             root.setAttribute('data-font-family', activeProject.fontFamily || 'sans');
             root.setAttribute('data-font-size', activeProject.fontSize || 'base');
         } else {
-            // Reset to defaults for the dashboard
             root.setAttribute('data-theme', defaultTheme);
             root.setAttribute('data-font-family', 'sans');
             root.setAttribute('data-font-size', 'base');
         }
     }, [activeProject, defaultTheme]);
 
+    const handleLoginSuccess = (user: User) => {
+        saveUserToStorage(user);
+        setCurrentUser(user);
+    };
+
+    const handleLogout = () => {
+        if (window.google) {
+            window.google.accounts.id.disableAutoSelect();
+        }
+        clearUserFromStorage();
+        setCurrentUser(null);
+    };
 
     const handleUpdateProject = (updatedProject: Project) => {
         setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
@@ -871,7 +980,6 @@ const App: React.FC = () => {
     };
 
     const handleDeleteProject = (id: string) => {
-        // Prevent deleting the tutorial project
         if (id === 'proj-tutorial') {
             alert("The tutorial project cannot be deleted. You can hide it using the checkbox on the dashboard.");
             return;
@@ -968,6 +1076,10 @@ const App: React.FC = () => {
         setActiveProjectId(newSubProjectId);
     };
 
+    if (!currentUser) {
+        return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    }
+
     if (activeProject) {
         return <ProjectView 
             project={activeProject} 
@@ -975,6 +1087,8 @@ const App: React.FC = () => {
             updateProject={handleUpdateProject} 
             selectProject={setActiveProjectId}
             onTaskDrillDown={(task) => handleTaskDrillDown(task, activeProject.id)}
+            currentUser={currentUser}
+            onLogout={handleLogout}
         />;
     }
 
@@ -987,6 +1101,8 @@ const App: React.FC = () => {
         onImportProject={handleImportProject}
         showTutorial={showTutorial}
         setShowTutorial={setShowTutorial}
+        currentUser={currentUser}
+        onLogout={handleLogout}
     />;
 };
 

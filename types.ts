@@ -76,6 +76,13 @@ export interface Project {
   fontSize?: FontSize;
 }
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  picture: string;
+}
+
 export interface TutorialStep {
   elementSelector: string;
   title: string;
