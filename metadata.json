@@ -1,0 +1,5 @@
+{
+  "name": "Zenith Project Manager",
+  "description": "An all-in-one Trello clone and project management application. It features a unique workflow where an 'Implementation Plan' document, written in a specific notation, automatically populates and synchronizes with a fully interactive Kanban board. Manage tasks with drag-and-drop, right-click menus, and see your progress at a glance with an automated progress bar.",
+  "requestFramePermissions": []
+}
