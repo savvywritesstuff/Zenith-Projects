@@ -98,7 +98,7 @@
         --color-bg-secondary: #21222c;
         --color-bg-tertiary: #44475a;
         --color-bg-hover: #6272a4;
-        --color-text-primary: #f8f82;
+        --color-text-primary: #f8f8f2;
         --color-text-secondary: #bd93f9;
         --color-border-primary: #44475a;
         --color-border-secondary: #6272a4;
@@ -200,6 +200,20 @@
       .markdown-preview strong { color: var(--color-text-primary); }
       .markdown-preview em { font-style: italic; color: var(--color-text-secondary); }
       .markdown-preview pre { background-color: var(--color-bg-primary); }
+      
+      @keyframes fade-in-up {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      .animate-fade-in-up {
+        animation: fade-in-up 0.2s ease-out forwards;
+      }
     </style>
   </head>
   <body>

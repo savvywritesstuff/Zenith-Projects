@@ -1,11 +1,20 @@
 import React from 'react';
-import { Comment, Task } from '../types';
+import { Comment, Task, CommentStatus } from '../types';
 import { TrashIcon } from './UI';
 
 interface CommentsViewProps {
     comments: Comment[];
     tasks: Task[];
     onDeleteComment: (commentId: string) => void;
+}
+
+const getStatusClass = (status: CommentStatus) => {
+  switch (status) {
+    case CommentStatus.Active: return 'bg-blue-500/80 text-white';
+    case CommentStatus.Resolved: return 'bg-green-500/80 text-white';
+    case CommentStatus.Discarded: return 'bg-slate-500/80 text-white';
+    default: return 'bg-tertiary text-secondary';
+  }
 }
 
 const CommentsView: React.FC<CommentsViewProps> = ({ comments, tasks, onDeleteComment }) => {
@@ -35,7 +44,12 @@ const CommentsView: React.FC<CommentsViewProps> = ({ comments, tasks, onDeleteCo
                                 )}
                                 <p className="text-primary whitespace-pre-wrap">{comment.content}</p>
                                 <div className="text-xs text-secondary mt-3 flex justify-between items-center">
-                                    <span>{new Date(comment.createdAt).toLocaleString()}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span>{new Date(comment.createdAt).toLocaleString()}</span>
+                                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusClass(comment.status)}`}>
+                                            {comment.status}
+                                        </span>
+                                    </div>
                                     <button
                                         onClick={() => {
                                             if (window.confirm('Are you sure you want to delete this comment?')) {

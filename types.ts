@@ -54,11 +54,29 @@ export interface Task {
   subProjectId?: string;
 }
 
+export enum CommentStatus {
+  Active = 'Active',
+  Resolved = 'Resolved',
+  Discarded = 'Discarded',
+}
+
 export interface Comment {
   id: string;
   taskId: string;
   content: string;
   createdAt: string; // ISO 8601 date string
+  status: CommentStatus;
+}
+
+export interface Label {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
 }
 
 export interface Project {
@@ -74,7 +92,22 @@ export interface Project {
   theme?: Theme;
   fontFamily?: FontFamily;
   fontSize?: FontSize;
+  lastBackupDate?: string; // ISO 8601
+  folderId?: string | null; // null for root
+  labelIds?: string[];
+  isArchived?: boolean;
 }
+
+
+export type BackupFrequency = 'daily' | 'weekly' | 'monthly' | 'never';
+
+export interface AppSettings {
+    backupFrequency: BackupFrequency;
+    lastBackupAllDate?: string; // ISO 8601
+    dashboardTheme: Theme;
+    applyThemeToAllProjects: boolean;
+}
+
 
 export interface TutorialStep {
   elementSelector: string;

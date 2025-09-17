@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { KANBAN_COLUMNS } from '../constants';
-import { Task, TaskStatus, Priority, Project } from '../types';
+import { Task, TaskStatus, Priority, Project, Comment, CommentStatus } from '../types';
+import { CommentIndicatorIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon, XIcon } from './UI';
+
 
 // --- PRIORITY TAG ---
 const getPriorityClass = (priority: Priority): string => {
@@ -22,12 +24,14 @@ const PriorityTag: React.FC<{ priority: Priority }> = ({ priority }) => (
 interface KanbanCardProps {
   task: Task;
   project: Project;
+  comments: Comment[];
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
   onRightClick: (e: React.MouseEvent<HTMLDivElement>, task: Task) => void;
   onDoubleClick: (task: Task) => void;
+  onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
 }
 
-const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, onDragStart, onRightClick, onDoubleClick }) => {
+const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comments, onDragStart, onRightClick, onDoubleClick, onUpdateCommentStatus }) => {
   const phaseColor = project.phaseColors[task.phase] || '#334155';
   const subPhaseColor = project.subPhaseColors[task.subPhase] || '#475569';
 
@@ -35,33 +39,96 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, onDragS
     background: `linear-gradient(135deg, ${phaseColor} 50%, ${subPhaseColor} 50%)`,
   };
 
+  const [isPopoverVisible, setIsPopoverVisible] = useState(false);
+  const [currentCommentIndex, setCurrentCommentIndex] = useState(0);
+
+  const activeComments = useMemo(() => comments.filter(c => c.status === CommentStatus.Active), [comments]);
+  
+  const handleMouseEnter = () => {
+    if (activeComments.length > 0) setIsPopoverVisible(true);
+  };
+  const handleMouseLeave = () => {
+    setIsPopoverVisible(false);
+    setCurrentCommentIndex(0);
+  };
+
+  const currentComment = activeComments[currentCommentIndex];
+
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, task.id)}
-      onContextMenu={(e) => onRightClick(e, task)}
-      onDoubleClick={() => onDoubleClick(task)}
-      className="p-1 mb-3 rounded-lg cursor-grab active:cursor-grabbing"
-      style={cardStyle}
-      data-task-id={task.id}
+      className="relative"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      <div className="bg-secondary p-3 rounded-md shadow-lg hover:bg-hover transition-colors">
-        <div className="flex justify-between items-start">
-          <span className="text-sm font-bold text-primary break-words max-w-full">{task.description}</span>
-        </div>
-        <div className="text-xs text-secondary mt-2">
-          <span className="font-mono bg-primary px-1.5 py-0.5 rounded mr-2">{task.id}</span>
-          <span>{task.phase} / {task.subPhase}</span>
-        </div>
-        <div className="mt-3">
-          <PriorityTag priority={task.priority} />
+      <div
+        draggable
+        onDragStart={(e) => onDragStart(e, task.id)}
+        onContextMenu={(e) => onRightClick(e, task)}
+        onDoubleClick={() => onDoubleClick(task)}
+        className="p-1 mb-3 rounded-lg cursor-grab active:cursor-grabbing"
+        style={cardStyle}
+        data-task-id={task.id}
+      >
+        <div className="bg-secondary p-3 rounded-md shadow-lg hover:bg-hover transition-colors relative">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-bold text-primary break-words max-w-full">{task.description}</span>
+          </div>
+          <div className="text-xs text-secondary mt-2">
+            <span className="font-mono bg-primary px-1.5 py-0.5 rounded mr-2">{task.id}</span>
+            <span>{task.phase} / {task.subPhase}</span>
+          </div>
+          <div className="mt-3 flex justify-between items-center">
+            <PriorityTag priority={task.priority} />
+             {activeComments.length > 0 && (
+                <div className="flex items-center gap-1 bg-tertiary px-1.5 py-0.5 rounded-full text-xs text-secondary">
+                    <CommentIndicatorIcon />
+                    <span>{activeComments.length}</span>
+                </div>
+              )}
+          </div>
         </div>
       </div>
+
+       {isPopoverVisible && currentComment && (
+        <div className="absolute bottom-full w-full left-0 p-1 z-10">
+          <div className="bg-tertiary rounded-md shadow-xl p-2 animate-fade-in-up border border-secondary">
+             <p className="text-sm text-primary mb-2 whitespace-pre-wrap">{currentComment.content}</p>
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1">
+                    <button 
+                        onClick={() => setCurrentCommentIndex(prev => prev - 1)} 
+                        disabled={currentCommentIndex === 0}
+                        className="p-1 rounded-full hover:bg-hover disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Previous Comment"
+                    ><ChevronLeftIcon /></button>
+                    <span className="text-xs text-secondary">{currentCommentIndex + 1} / {activeComments.length}</span>
+                     <button 
+                        onClick={() => setCurrentCommentIndex(prev => prev + 1)} 
+                        disabled={currentCommentIndex === activeComments.length - 1}
+                        className="p-1 rounded-full hover:bg-hover disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Next Comment"
+                    ><ChevronRightIcon /></button>
+                </div>
+                <div className="flex items-center gap-1">
+                     <button 
+                        onClick={() => onUpdateCommentStatus(currentComment.id, CommentStatus.Resolved)}
+                        className="p-1 rounded-full text-green-400 hover:bg-green-500/20"
+                        title="Mark as Resolved"
+                    ><CheckIcon /></button>
+                     <button 
+                        onClick={() => onUpdateCommentStatus(currentComment.id, CommentStatus.Discarded)}
+                        className="p-1 rounded-full text-red-400 hover:bg-red-500/20"
+                        title="Mark as Discarded"
+                    ><XIcon /></button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// Memoize Card to prevent re-renders during drag-over events on other columns
 export const KanbanCard = React.memo(KanbanCardComponent);
 
 // --- KANBAN COLUMN ---
@@ -69,13 +136,15 @@ interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
   project: Project;
+  comments: Comment[];
   onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
   onRightClick: (e: React.MouseEvent<HTMLDivElement>, task: Task) => void;
   onDrop: (e: React.DragEvent<HTMLDivElement>, status: TaskStatus) => void;
   onDoubleClick: (task: Task) => void;
+  onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, onDragStart, onRightClick, onDrop, onDoubleClick }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus }) => {
   const [isOver, setIsOver] = React.useState(false);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -109,9 +178,11 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, onD
             key={task.id} 
             task={task} 
             project={project} 
+            comments={comments.filter(c => c.taskId === task.id)}
             onDragStart={onDragStart} 
             onRightClick={onRightClick}
             onDoubleClick={onDoubleClick}
+            onUpdateCommentStatus={onUpdateCommentStatus}
           />
         ))}
       </div>
@@ -123,14 +194,16 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, onD
 interface KanbanBoardProps {
   tasks: Task[];
   project: Project;
+  comments: Comment[];
   onTaskUpdate: (updatedTask: Task) => void;
   onTaskDelete: (taskId: string) => void;
   onTaskMove: (taskId: string, newStatus: TaskStatus) => void;
   onTaskDrillDown: (task: Task) => void;
   onRightClick: (e: React.MouseEvent<HTMLDivElement>, task: Task) => void;
+  onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, onTaskMove, onTaskDrillDown, ...rest }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, comments, onTaskMove, onTaskDrillDown, onUpdateCommentStatus, ...rest }) => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
     e.dataTransfer.setData('taskId', taskId);
   };
@@ -150,9 +223,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, onTask
             status={status}
             tasks={tasks.filter(task => task.status === status)}
             project={project}
+            comments={comments}
             onDragStart={handleDragStart}
             onDrop={handleDrop}
             onDoubleClick={onTaskDrillDown}
+            onUpdateCommentStatus={onUpdateCommentStatus}
             {...rest}
           />
           {index < KANBAN_COLUMNS.length - 1 && (

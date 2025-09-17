@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Task, TaskStatus, Priority } from '../types';
 import { HiQuestionMarkCircle } from 'react-icons/hi2';
-import { RiArchiveLine, RiUploadCloud2Line, RiSettings3Line, RiChat1Line, RiChatNewLine } from 'react-icons/ri';
+import { RiArchiveLine, RiUploadCloud2Line, RiSettings3Line, RiChat1Line, RiChatNewLine, RiInboxUnarchiveLine, RiSave3Line, RiFolderLine, RiFolderAddLine, RiPriceTag3Line, RiChat3Line, RiCheckLine, RiCloseLine, RiArrowLeftSLine, RiArrowRightSLine, RiChatDeleteLine } from 'react-icons/ri';
 
 // --- ICONS ---
 export const PlusIcon = () => (
@@ -17,7 +17,7 @@ export const TrashIcon = () => (
 );
 
 export const ArchiveIcon = () => (
-    <RiArchiveLine className="h-5 w-5" />
+    <RiArchiveLine className="h-5 w-5 mr-2" />
 );
 
 export const UploadIcon = () => (
@@ -75,6 +75,20 @@ export const PencilIcon = () => (
 export const HelpIcon = () => (
     <HiQuestionMarkCircle className="h-6 w-6" />
 );
+
+export const RestoreIcon = () => <RiInboxUnarchiveLine className="h-5 w-5 mr-2" />;
+export const BackupAllIcon = () => <RiSave3Line className="h-6 w-6" />;
+export const FolderIcon = () => <RiFolderLine className="h-5 w-5 mr-2" />;
+export const AddFolderIcon = () => <RiFolderAddLine className="h-5 w-5 mr-2" />;
+export const LabelIcon = () => <RiPriceTag3Line className="h-5 w-5 mr-2" />;
+
+// Comment-related icons
+export const CommentIndicatorIcon = () => <RiChat3Line className="w-3 h-3" />;
+export const CheckIcon = () => <RiCheckLine className="w-5 h-5" />;
+export const XIcon = () => <RiCloseLine className="w-5 h-5" />;
+export const ChevronLeftIcon = () => <RiArrowLeftSLine className="w-5 h-5" />;
+export const ChevronRightIcon = () => <RiArrowRightSLine className="w-5 h-5" />;
+export const RemoveAllCommentsIcon = () => <RiChatDeleteLine className="h-5 w-5 mr-2" />;
 
 
 // --- PROGRESS BAR ---

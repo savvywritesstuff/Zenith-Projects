@@ -1,5 +1,7 @@
 import { Project, Task, TaskStatus, Priority, Theme, Comment } from '../types';
 import { KANBAN_COLUMNS } from '../constants';
+import { AppData } from './storageService';
+
 
 // --- COLOR SERVICE ---
 
@@ -183,13 +185,20 @@ export const getTutorialProject = (): Project => {
         fontFamily: 'sans',
         fontSize: 'base',
         phaseColors,
-        subPhaseColors
+        subPhaseColors,
+        isArchived: false,
+        folderId: null,
+        labelIds: [],
     };
 };
 
 
 // --- INITIAL DATA ---
 
-export const getInitialProjects = (): Project[] => {
-    return [getTutorialProject()];
+export const getInitialData = (): AppData => {
+    return {
+        projects: [getTutorialProject()],
+        folders: [],
+        labels: [],
+    };
 }
