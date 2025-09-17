@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import JSZip from 'jszip';
 import { GiGearHammer } from 'react-icons/gi';
 import { CiStickyNote } from 'react-icons/ci';
 import { HiOutlineClipboardDocumentList, HiChevronDoubleLeft, HiChevronDoubleRight } from 'react-icons/hi2';
@@ -6,7 +7,7 @@ import { Project, Task, TaskStatus, Priority, TutorialStep } from './types';
 import { KanbanBoard } from './components/Kanban';
 import { EditableDocumentPanel, implementationPlanHelpText } from './components/Documents';
 import Tutorial from './components/Tutorial';
-import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation } from './components/UI';
+import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon } from './components/UI';
 import { getInitialProjects, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
 import { saveProjectsToCookie, loadProjectsFromCookie } from './services/storageService';
 
@@ -331,26 +332,184 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     );
 };
 
+// --- IMPORT FORM ---
+type ImportData = {
+    targetProjectId: string | 'new';
+    newProjectName?: string;
+    documents: {
+        planningDocument: string;
+        implementationPlan: string;
+        scratchpad: string;
+    };
+};
+interface ImportProjectFormProps {
+    projects: Project[];
+    onImport: (data: ImportData) => void;
+    onCancel: () => void;
+}
+
+const ImportProjectForm: React.FC<ImportProjectFormProps> = ({ projects, onImport, onCancel }) => {
+    const [targetProjectId, setTargetProjectId] = useState<string | 'new'>('new');
+    const [newProjectName, setNewProjectName] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleFileRead = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target?.result as string);
+            reader.onerror = (error) => reject(error);
+            reader.readAsText(file);
+        });
+    };
+
+    const handleImportFromZip = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsLoading(true);
+        setError(null);
+        try {
+            const zip = await JSZip.loadAsync(file);
+            const planningDocument = await zip.file('planning_document.md')?.async('string') ?? '';
+            const implementationPlan = await zip.file('implementation_plan.md')?.async('string') ?? '';
+            const scratchpad = await zip.file('scratchpad.md')?.async('string') ?? '';
+            
+            handleSubmit({ planningDocument, implementationPlan, scratchpad });
+
+        } catch (err) {
+            setError('Failed to read the ZIP file. Please ensure it is a valid backup.');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const handleSubmit = (documents: ImportData['documents']) => {
+        if (targetProjectId === 'new' && !newProjectName.trim()) {
+            setError('Please provide a name for the new project.');
+            return;
+        }
+        onImport({
+            targetProjectId,
+            newProjectName,
+            documents,
+        });
+    };
+
+
+    return (
+         <div className="space-y-4">
+            {error && <p className="text-red-400 bg-red-900/50 p-3 rounded-md">{error}</p>}
+             <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">Target Project</label>
+                <select 
+                    value={targetProjectId}
+                    onChange={(e) => setTargetProjectId(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                    <option value="new">-- Create New Project --</option>
+                    {projects.filter(p => p.id !== 'proj-tutorial').map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                </select>
+            </div>
+
+            {targetProjectId === 'new' && (
+                 <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">New Project Name</label>
+                    <input
+                        type="text"
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        placeholder="Enter name for the new project"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                </div>
+            )}
+            
+            <div>
+                 <label className="block text-sm font-medium text-slate-400 mb-2">Import from Backup (.zip)</label>
+                 <input
+                    type="file"
+                    accept=".zip"
+                    onChange={handleImportFromZip}
+                    disabled={isLoading}
+                    className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-900/50 file:text-blue-300 hover:file:bg-blue-900"
+                 />
+                 <p className="text-xs text-slate-500 mt-1">Select a .zip file created from the backup option.</p>
+            </div>
+             <div className="flex justify-end pt-4">
+                 <button onClick={onCancel} className="px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-md transition-colors">
+                     {isLoading ? 'Close' : 'Cancel'}
+                 </button>
+            </div>
+         </div>
+    );
+};
+
+
 // --- DASHBOARD VIEW ---
 interface DashboardProps {
     projects: Project[];
     onSelectProject: (id: string) => void;
     onAddProject: (name: string) => void;
     onDeleteProject: (id: string) => void;
+    onUpdateProject: (project: Project) => void;
+    onImportProject: (data: ImportData) => void;
     showTutorial: boolean;
     setShowTutorial: (show: boolean) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddProject, onDeleteProject, showTutorial, setShowTutorial }) => {
+const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddProject, onDeleteProject, onUpdateProject, onImportProject, showTutorial, setShowTutorial }) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [backingUpProject, setBackingUpProject] = useState<Project | null>(null);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project } | null>(null);
+    const [editingProject, setEditingProject] = useState<Project | null>(null);
+    const [updatedProjectName, setUpdatedProjectName] = useState('');
 
     const handleAddProject = () => {
         if (newProjectName.trim()) {
             onAddProject(newProjectName.trim());
             setNewProjectName('');
             setShowAddModal(false);
+        }
+    };
+
+    const handleProjectBackup = async (project: Project | null) => {
+        if (!project) return;
+        const zip = new JSZip();
+        zip.file('planning_document.md', project.planningDocument);
+        zip.file('implementation_plan.md', project.implementationPlan);
+        zip.file('scratchpad.md', project.scratchpad);
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        const safeName = project.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        link.download = `zenith_backup_${safeName}.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        setBackingUpProject(null);
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, project: Project) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, project });
+    };
+
+    const handleRenameProject = () => {
+        if (editingProject && updatedProjectName.trim()) {
+            onUpdateProject({ ...editingProject, name: updatedProjectName.trim() });
+            setEditingProject(null);
+            setUpdatedProjectName('');
         }
     };
     
@@ -380,6 +539,9 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddP
                             />
                             Show Tutorial
                         </label>
+                        <button onClick={() => setIsImportModalOpen(true)} title="Import Project" className="text-slate-400 hover:text-white transition-colors">
+                           <UploadIcon />
+                        </button>
                         <button onClick={() => setIsHelpOpen(true)} title="Help" className="text-slate-400 hover:text-white transition-colors">
                            <HelpIcon />
                         </button>
@@ -389,18 +551,14 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddP
             <div className="w-full max-w-4xl">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {mainProjects.map(project => (
-                        <div key={project.id} className="bg-slate-800 rounded-lg p-5 group relative border border-slate-700 hover:border-blue-500 transition-all duration-300">
-                           <div onClick={() => onSelectProject(project.id)} className="cursor-pointer">
-                                <h2 className="text-xl font-bold text-slate-200 truncate">{project.name}</h2>
-                                <p className="text-slate-400 mt-2">{project.tasks.length} tasks</p>
-                            </div>
-                            <button
-                                onClick={() => onDeleteProject(project.id)}
-                                className="absolute top-3 right-3 p-1.5 rounded-full bg-slate-700 text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all duration-300"
-                                title="Delete Project"
-                            >
-                                <TrashIcon />
-                            </button>
+                        <div 
+                            key={project.id} 
+                            onClick={() => onSelectProject(project.id)}
+                            onContextMenu={(e) => handleContextMenu(e, project)}
+                            className="bg-slate-800 rounded-lg p-5 group relative border border-slate-700 hover:border-blue-500 transition-all duration-300 cursor-pointer"
+                        >
+                            <h2 className="text-xl font-bold text-slate-200 truncate">{project.name}</h2>
+                            <p className="text-slate-400 mt-2">{project.tasks.length} tasks</p>
                         </div>
                     ))}
                     <button
@@ -431,8 +589,80 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, onSelectProject, onAddP
                     </div>
                 </div>
             </Modal>
+            <Modal isOpen={!!backingUpProject} onClose={() => setBackingUpProject(null)} title={`Backup "${backingUpProject?.name}"?`}>
+                <p className="text-slate-300 mb-6">This will download a .zip file containing the Planning Document, Implementation Plan, and Scratchpad for this project.</p>
+                <div className="flex justify-end space-x-3">
+                    <button onClick={() => setBackingUpProject(null)} className="px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-md transition-colors">Cancel</button>
+                    <button onClick={() => handleProjectBackup(backingUpProject)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">Download Backup</button>
+                </div>
+            </Modal>
+             <Modal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} title="Import Project Data" size="lg">
+                <ImportProjectForm 
+                    projects={projects}
+                    onImport={(data) => {
+                        onImportProject(data);
+                        setIsImportModalOpen(false);
+                    }}
+                    onCancel={() => setIsImportModalOpen(false)}
+                />
+            </Modal>
             <Modal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="Help & Documentation">
                 <HelpDocumentation />
+            </Modal>
+             {contextMenu && (
+                <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)}>
+                    <button
+                        onClick={() => {
+                            setEditingProject(contextMenu.project);
+                            setUpdatedProjectName(contextMenu.project.name);
+                            setContextMenu(null);
+                        }}
+                        className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    >
+                        <EditIcon /> Rename
+                    </button>
+                    <button
+                        onClick={() => {
+                            setBackingUpProject(contextMenu.project);
+                            setContextMenu(null);
+                        }}
+                        className="flex items-center w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-700"
+                    >
+                        <ArchiveIcon /> Backup
+                    </button>
+                    {contextMenu.project.id !== 'proj-tutorial' && (
+                        <button
+                            onClick={() => {
+                                onDeleteProject(contextMenu.project.id);
+                                setContextMenu(null);
+                            }}
+                            className="flex items-center w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-slate-700"
+                        >
+                            <TrashIcon /> Delete
+                        </button>
+                    )}
+                </ContextMenu>
+            )}
+            <Modal isOpen={!!editingProject} onClose={() => setEditingProject(null)} title="Rename Project">
+                <div className="space-y-4">
+                    <input
+                        type="text"
+                        value={updatedProjectName}
+                        onChange={(e) => setUpdatedProjectName(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameProject();
+                        }}
+                        placeholder="Project Name"
+                        className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        autoFocus
+                    />
+                    <div className="flex justify-end space-x-3 pt-4">
+                         <button onClick={() => setEditingProject(null)} className="px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-md transition-colors">Cancel</button>
+                        <button onClick={handleRenameProject} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">
+                            Save
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );
@@ -490,6 +720,46 @@ const App: React.FC = () => {
         }
         setProjects(projects.filter(p => p.id !== id));
     };
+
+    const handleImportProject = (data: ImportData) => {
+        if (data.targetProjectId === 'new') {
+            const newProject: Project = {
+                id: `proj-${Date.now()}`,
+                name: data.newProjectName!,
+                planningDocument: data.documents.planningDocument,
+                implementationPlan: data.documents.implementationPlan,
+                scratchpad: data.documents.scratchpad,
+                tasks: [],
+                phaseColors: {},
+                subPhaseColors: {},
+            };
+            const newTasks = parseImplementationPlan(newProject.implementationPlan);
+            newProject.tasks = newTasks;
+            const { phaseColors, subPhaseColors } = assignColors(newTasks, {}, {});
+            newProject.phaseColors = phaseColors;
+            newProject.subPhaseColors = subPhaseColors;
+            setProjects([...projects, newProject]);
+        } else {
+            setProjects(projects.map(p => {
+                if (p.id === data.targetProjectId) {
+                    const updatedProject = {
+                        ...p,
+                        planningDocument: data.documents.planningDocument,
+                        implementationPlan: data.documents.implementationPlan,
+                        scratchpad: data.documents.scratchpad,
+                    };
+                    const newTasks = parseImplementationPlan(updatedProject.implementationPlan);
+                    updatedProject.tasks = newTasks;
+                    const { phaseColors, subPhaseColors } = assignColors(newTasks, p.phaseColors, p.subPhaseColors);
+                    updatedProject.phaseColors = phaseColors;
+                    updatedProject.subPhaseColors = subPhaseColors;
+                    return updatedProject;
+                }
+                return p;
+            }));
+        }
+    };
+
 
     const handleTaskDrillDown = (task: Task, parentProjectId: string) => {
         const existingSubProject = projects.find(p => p.id === task.subProjectId);
@@ -549,6 +819,8 @@ const App: React.FC = () => {
         onSelectProject={setActiveProjectId} 
         onAddProject={handleAddProject} 
         onDeleteProject={handleDeleteProject}
+        onUpdateProject={handleUpdateProject}
+        onImportProject={handleImportProject}
         showTutorial={showTutorial}
         setShowTutorial={setShowTutorial}
     />;

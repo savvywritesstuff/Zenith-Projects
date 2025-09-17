@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Task, TaskStatus, Priority } from '../types';
 import { HiQuestionMarkCircle } from 'react-icons/hi2';
+import { RiArchiveLine, RiUploadCloud2Line } from 'react-icons/ri';
 
 // --- ICONS ---
 export const PlusIcon = () => (
@@ -10,10 +11,19 @@ export const PlusIcon = () => (
 );
 
 export const TrashIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
     </svg>
 );
+
+export const ArchiveIcon = () => (
+    <RiArchiveLine className="h-5 w-5" />
+);
+
+export const UploadIcon = () => (
+    <RiUploadCloud2Line className="h-6 w-6" />
+);
+
 
 export const EditIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,13 +151,20 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  size?: 'md' | 'lg' | 'xl';
 }
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md' }) => {
   if (!isOpen) return null;
+
+  const sizeClasses = {
+      md: 'max-w-2xl',
+      lg: 'max-w-4xl',
+      xl: 'max-w-6xl',
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
-      <div className="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl m-4 border border-slate-700">
+      <div className={`bg-slate-800 rounded-lg shadow-xl w-full m-4 border border-slate-700 ${sizeClasses[size]}`}>
         <div className="flex justify-between items-center p-4 border-b border-slate-700">
           <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">&times;</button>
@@ -348,6 +365,7 @@ export const HelpDocumentation: React.FC = () => (
         <p>This is your main view where you can see all your projects. Click on a project card to open it. You can create new projects or delete existing ones.</p>
         <ul>
             <li><strong>Show Tutorial Project:</strong> Use the checkbox at the top to show or hide the interactive tutorial project.</li>
+            <li><strong>Backup & Import:</strong> Hover over a project to find the backup icon. Use the import icon in the header to upload project data from a `.zip` file or individual `.md` files.</li>
         </ul>
 
         <h2>Project View</h2>
