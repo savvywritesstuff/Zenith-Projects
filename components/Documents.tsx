@@ -227,21 +227,21 @@ export const EditableDocumentPanel: React.FC<EditableDocumentPanelProps> = ({ ti
   }, [showSuggestions, activeSuggestionIndex, suggestions, applySuggestion, docType, onContentChange]);
 
   const rootClasses = isFullScreen
-    ? "fixed inset-0 bg-slate-900 z-[100] p-4 flex flex-col"
-    : "bg-slate-800/50 rounded-lg p-4 flex flex-col h-full border border-slate-700";
+    ? "fixed inset-0 bg-primary z-[100] p-4 flex flex-col"
+    : "bg-secondary/50 rounded-lg p-4 flex flex-col h-full border border-secondary";
 
   return (
     <div className={rootClasses} role={isFullScreen ? "dialog" : undefined} aria-modal={isFullScreen}>
       <div className="flex items-center justify-between gap-2 mb-3 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-bold text-slate-300">{title}</h2>
+          <h2 className="text-xl font-bold text-secondary">{title}</h2>
           {accessory}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onToggleEdit} className={`p-1.5 rounded-md transition-colors ${isEditing ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`} title={isEditing ? "Switch to View Mode" : "Switch to Edit Mode"}>
+          <button onClick={onToggleEdit} className={`p-1.5 rounded-md transition-colors ${isEditing ? 'bg-accent text-accent-text' : 'text-secondary hover:text-primary hover:bg-hover'}`} title={isEditing ? "Switch to View Mode" : "Switch to Edit Mode"}>
             <PencilIcon />
           </button>
-          <button onClick={onToggleFullScreen} className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 transition-colors" title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}>
+          <button onClick={onToggleFullScreen} className="p-1.5 rounded-md text-secondary hover:text-primary hover:bg-hover transition-colors" title={isFullScreen ? "Exit Full Screen" : "Enter Full Screen"}>
             {isFullScreen ? <ExitFullScreenIcon /> : <FullScreenIcon />}
           </button>
         </div>
@@ -255,13 +255,13 @@ export const EditableDocumentPanel: React.FC<EditableDocumentPanelProps> = ({ ti
           onKeyDown={handleKeyDown}
           onMouseUp={onTextSelection ? handleMouseUp : undefined}
           onContextMenu={onContextMenu}
-          className="w-full flex-grow min-h-0 bg-slate-800 rounded-md p-3 text-slate-300 font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none border border-slate-700"
+          className="w-full flex-grow min-h-0 bg-secondary rounded-md p-3 text-primary resize-none focus:ring-2 focus:ring-accent outline-none border border-secondary"
           spellCheck="false"
           autoFocus={!isFullScreen} // Only autofocus on initial inline edit
         />
       ) : (
         <div 
-          className="w-full flex-grow min-h-0 text-slate-300 font-sans text-sm overflow-y-auto markdown-preview"
+          className="w-full flex-grow min-h-0 text-primary font-sans overflow-y-auto markdown-preview"
           onContextMenu={onContextMenu}
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />
@@ -269,14 +269,14 @@ export const EditableDocumentPanel: React.FC<EditableDocumentPanelProps> = ({ ti
 
       {showSuggestions && suggestionPosition && (
         <div 
-            className="fixed z-[101] bg-slate-700 border border-slate-600 rounded-md shadow-lg w-full max-w-xs"
+            className="fixed z-[101] bg-tertiary border border-secondary rounded-md shadow-lg w-full max-w-xs"
             style={{ top: suggestionPosition.top, left: suggestionPosition.left }}
         >
           <ul className="py-1 max-h-48 overflow-y-auto">
             {suggestions.map((suggestion, index) => (
               <li
                 key={suggestion}
-                className={`px-4 py-2 cursor-pointer text-sm ${index === activeSuggestionIndex ? 'bg-blue-600 text-white' : 'hover:bg-slate-600 text-slate-200'}`}
+                className={`px-4 py-2 cursor-pointer text-sm ${index === activeSuggestionIndex ? 'bg-accent text-accent-text' : 'hover:bg-hover text-primary'}`}
                 onClick={() => applySuggestion(index)}
                 onMouseEnter={() => setActiveSuggestionIndex(index)}
               >
@@ -293,7 +293,7 @@ export const EditableDocumentPanel: React.FC<EditableDocumentPanelProps> = ({ ti
 export const implementationPlanHelpText = (
   <div className="text-left">
     <p className="font-bold mb-2">Formatting Guide:</p>
-    <pre className="text-xs bg-slate-800 p-2 rounded font-mono whitespace-pre-wrap">
+    <pre className="text-xs bg-secondary p-2 rounded font-mono whitespace-pre-wrap">
       <code>
 {`# Status (e.g., To-Do)
 ## Phase Name (e.g., Backend)
@@ -301,7 +301,7 @@ export const implementationPlanHelpText = (
       </code>
     </pre>
     <p className="font-bold mt-3 mb-1">Example:</p>
-    <pre className="text-xs bg-slate-800 p-2 rounded font-mono whitespace-pre-wrap">
+    <pre className="text-xs bg-secondary p-2 rounded font-mono whitespace-pre-wrap">
     <code>
 {`# To-Do
 ## Backend

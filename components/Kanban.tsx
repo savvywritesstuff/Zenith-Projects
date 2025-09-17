@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { KANBAN_COLUMNS } from '../constants';
 import { Task, TaskStatus, Priority, Project } from '../types';
@@ -47,12 +45,12 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, onDragS
       style={cardStyle}
       data-task-id={task.id}
     >
-      <div className="bg-slate-800 p-3 rounded-md shadow-lg hover:bg-slate-700/80 transition-colors">
+      <div className="bg-secondary p-3 rounded-md shadow-lg hover:bg-hover transition-colors">
         <div className="flex justify-between items-start">
-          <span className="text-sm font-bold text-slate-300 break-words max-w-full">{task.description}</span>
+          <span className="text-sm font-bold text-primary break-words max-w-full">{task.description}</span>
         </div>
-        <div className="text-xs text-slate-400 mt-2">
-          <span className="font-mono bg-slate-900 px-1.5 py-0.5 rounded mr-2">{task.id}</span>
+        <div className="text-xs text-secondary mt-2">
+          <span className="font-mono bg-primary px-1.5 py-0.5 rounded mr-2">{task.id}</span>
           <span>{task.phase} / {task.subPhase}</span>
         </div>
         <div className="mt-3">
@@ -97,11 +95,11 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, onD
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-shrink-0 w-80 bg-slate-800/70 rounded-lg p-3 mr-4 h-full flex flex-col transition-all duration-300 ${isOver ? 'bg-blue-900/50 ring-2 ring-blue-500' : ''}`}
+      className={`flex-shrink-0 w-80 bg-secondary/70 rounded-lg p-3 h-full flex flex-col transition-all duration-300 ${isOver ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
     >
-      <h3 className="font-bold text-lg mb-4 px-1 flex items-center">
+      <h3 className="font-bold text-lg mb-4 px-1 flex items-center text-primary">
         {status}
-        <span className="ml-2 text-sm font-normal bg-slate-700 text-slate-300 rounded-full h-6 w-6 flex items-center justify-center">
+        <span className="ml-2 text-sm font-normal bg-tertiary text-secondary rounded-full h-6 w-6 flex items-center justify-center">
           {tasks.length}
         </span>
       </h3>
@@ -146,17 +144,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, onTask
 
   return (
     <div className="flex-grow flex p-1 overflow-x-auto h-full" data-tutorial-id="kanban-board">
-      {KANBAN_COLUMNS.map(status => (
-        <KanbanColumn
-          key={status}
-          status={status}
-          tasks={tasks.filter(task => task.status === status)}
-          project={project}
-          onDragStart={handleDragStart}
-          onDrop={handleDrop}
-          onDoubleClick={onTaskDrillDown}
-          {...rest}
-        />
+      {KANBAN_COLUMNS.map((status, index) => (
+        <React.Fragment key={status}>
+          <KanbanColumn
+            status={status}
+            tasks={tasks.filter(task => task.status === status)}
+            project={project}
+            onDragStart={handleDragStart}
+            onDrop={handleDrop}
+            onDoubleClick={onTaskDrillDown}
+            {...rest}
+          />
+          {index < KANBAN_COLUMNS.length - 1 && (
+            <div className="w-px bg-tertiary self-stretch flex-shrink-0 mx-2 my-4" />
+          )}
+        </React.Fragment>
       ))}
     </div>
   );

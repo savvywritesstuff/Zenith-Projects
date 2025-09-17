@@ -1,30 +1,50 @@
-import { Project, Task, TaskStatus, Priority } from '../types';
+import { Project, Task, TaskStatus, Priority, Theme, Comment } from '../types';
 import { KANBAN_COLUMNS } from '../constants';
 
 // --- COLOR SERVICE ---
-export const generateRainbowColor = (index: number, total: number, saturation: number, lightness: number): string => {
-  const hue = Math.round((index / total) * 360);
+
+interface ThemeColorConfig {
+    phase: { saturation: number; lightness: number; hueShift: number; spread: number };
+    subPhase: { saturation: number; lightness: number; hueShift: number; spread: number };
+}
+
+// Configuration to generate harmonious colors based on the selected theme
+const themeColorConfigs: Record<Theme, ThemeColorConfig> = {
+    'dark': { phase: { saturation: 90, lightness: 45, hueShift: 0, spread: 360 }, subPhase: { saturation: 70, lightness: 80, hueShift: 0, spread: 360 } },
+    'light': { phase: { saturation: 90, lightness: 40, hueShift: 0, spread: 360 }, subPhase: { saturation: 80, lightness: 75, hueShift: 0, spread: 360 } },
+    'catppuccin': { phase: { saturation: 80, lightness: 70, hueShift: 265, spread: 150 }, subPhase: { saturation: 70, lightness: 85, hueShift: 265, spread: 150 } },
+    'solarized-light': { phase: { saturation: 60, lightness: 50, hueShift: 205, spread: 180 }, subPhase: { saturation: 60, lightness: 80, hueShift: 205, spread: 180 } },
+    'solarized-dark': { phase: { saturation: 60, lightness: 50, hueShift: 205, spread: 180 }, subPhase: { saturation: 60, lightness: 80, hueShift: 205, spread: 180 } },
+    'high-contrast': { phase: { saturation: 100, lightness: 50, hueShift: 0, spread: 360 }, subPhase: { saturation: 90, lightness: 80, hueShift: 0, spread: 360 } },
+    'dracula': { phase: { saturation: 90, lightness: 70, hueShift: 280, spread: 120 }, subPhase: { saturation: 80, lightness: 85, hueShift: 280, spread: 120 } },
+    'nord': { phase: { saturation: 40, lightness: 60, hueShift: 200, spread: 100 }, subPhase: { saturation: 50, lightness: 80, hueShift: 200, spread: 100 } },
+};
+
+export const generateHarmoniousColor = (index: number, total: number, saturation: number, lightness: number, hueShift: number, spread: number): string => {
+  const hue = (Math.round((index / total) * spread) + hueShift) % 360;
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
-export const assignColors = (tasks: Task[], existingPhaseColors: Record<string, string>, existingSubPhaseColors: Record<string, string>): { phaseColors: Record<string, string>, subPhaseColors: Record<string, string> } => {
+export const assignColors = (tasks: Task[], existingPhaseColors: Record<string, string>, existingSubPhaseColors: Record<string, string>, theme: Theme): { phaseColors: Record<string, string>, subPhaseColors: Record<string, string> } => {
   const newPhaseColors = { ...existingPhaseColors };
   const newSubPhaseColors = { ...existingSubPhaseColors };
 
   const uniquePhases = [...new Set(tasks.map(t => t.phase))];
   const uniqueSubPhases = [...new Set(tasks.map(t => t.subPhase))];
 
+  const config = themeColorConfigs[theme] || themeColorConfigs['dark'];
+
   uniquePhases.forEach((phase) => {
     if (!newPhaseColors[phase]) {
-      // Darker, more saturated colors for phases
-      newPhaseColors[phase] = generateRainbowColor(Object.keys(newPhaseColors).length, uniquePhases.length + Object.keys(newPhaseColors).length, 90, 45);
+      const { saturation, lightness, hueShift, spread } = config.phase;
+      newPhaseColors[phase] = generateHarmoniousColor(Object.keys(newPhaseColors).length, uniquePhases.length + Object.keys(newPhaseColors).length, saturation, lightness, hueShift, spread);
     }
   });
 
   uniqueSubPhases.forEach((subPhase) => {
     if (!newSubPhaseColors[subPhase]) {
-      // Lighter, more pastel colors for sub-phases
-      newSubPhaseColors[subPhase] = generateRainbowColor(Object.keys(newSubPhaseColors).length, uniqueSubPhases.length + Object.keys(newSubPhaseColors).length, 70, 80);
+      const { saturation, lightness, hueShift, spread } = config.subPhase;
+      newSubPhaseColors[subPhase] = generateHarmoniousColor(Object.keys(newSubPhaseColors).length, uniqueSubPhases.length + Object.keys(newSubPhaseColors).length, saturation, lightness, hueShift, spread);
     }
   });
 
@@ -148,7 +168,8 @@ It's private to this project and won't affect your Kanban board. Feel free to ex
 
 export const getTutorialProject = (): Project => {
     const initialTasks = parseImplementationPlan(tutorialImplementationPlan);
-    const { phaseColors, subPhaseColors } = assignColors(initialTasks, {}, {});
+    const theme: Theme = 'dark';
+    const { phaseColors, subPhaseColors } = assignColors(initialTasks, {}, {}, theme);
 
     return {
         id: 'proj-tutorial',
@@ -157,6 +178,10 @@ export const getTutorialProject = (): Project => {
         implementationPlan: tutorialImplementationPlan,
         scratchpad: tutorialScratchpad,
         tasks: initialTasks,
+        comments: [],
+        theme,
+        fontFamily: 'sans',
+        fontSize: 'base',
         phaseColors,
         subPhaseColors
     };

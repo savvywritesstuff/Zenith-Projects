@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Task, TaskStatus, Priority } from '../types';
 import { HiQuestionMarkCircle } from 'react-icons/hi2';
-import { RiArchiveLine, RiUploadCloud2Line } from 'react-icons/ri';
+import { RiArchiveLine, RiUploadCloud2Line, RiSettings3Line, RiChat1Line, RiChatNewLine } from 'react-icons/ri';
 
 // --- ICONS ---
 export const PlusIcon = () => (
@@ -24,6 +24,17 @@ export const UploadIcon = () => (
     <RiUploadCloud2Line className="h-6 w-6" />
 );
 
+export const SettingsIcon = () => (
+    <RiSettings3Line className="h-6 w-6" />
+);
+
+export const CommentIcon = () => (
+    <RiChat1Line className="w-7 h-7" />
+);
+
+export const AddCommentIcon = () => (
+    <RiChatNewLine className="h-5 w-5 mr-2" />
+);
 
 export const EditIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -38,7 +49,7 @@ export const ExpandIcon = () => (
 );
 
 export const InfoIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
@@ -76,12 +87,12 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ tasks }) => {
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="w-full bg-slate-700 rounded-full h-4 my-4 relative overflow-hidden">
+    <div className="w-full bg-tertiary rounded-full h-4 my-4 relative overflow-hidden">
       <div
-        className="bg-gradient-to-r from-cyan-500 to-blue-500 h-4 rounded-full transition-all duration-500 ease-out"
+        className="bg-accent h-4 rounded-full transition-all duration-500 ease-out"
         style={{ width: `${progress}%` }}
       ></div>
-      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-accent-text">
         {progress}% Complete ({doneTasks}/{totalTasks})
       </span>
     </div>
@@ -115,7 +126,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, childre
     return (
         <div
             ref={menuRef}
-            className="absolute z-50 bg-slate-800 border border-slate-600 rounded-md shadow-lg py-2 min-w-[150px]"
+            className="absolute z-50 bg-secondary border border-secondary rounded-md shadow-lg py-2 min-w-[150px]"
             style={{ top: y, left: x }}
         >
             {children}
@@ -132,13 +143,13 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ children }) => {
     <div className="relative group flex items-center cursor-help">
       <InfoIcon />
       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-sm
-                      bg-slate-700 text-white text-sm rounded-md shadow-lg p-3
+                      bg-tertiary text-primary text-sm rounded-md shadow-lg p-3
                       opacity-0 group-hover:opacity-100 transition-opacity duration-300
-                      pointer-events-none z-10 border border-slate-600">
+                      pointer-events-none z-10 border border-secondary">
         {children}
         <div className="absolute left-1/2 -translate-x-1/2 bottom-full w-0 h-0
                         border-x-8 border-x-transparent
-                        border-b-8 border-b-slate-700"></div>
+                        border-b-8 border-b-tertiary"></div>
       </div>
     </div>
   );
@@ -161,13 +172,23 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       lg: 'max-w-4xl',
       xl: 'max-w-6xl',
   };
+  
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Close modal if the click is on the backdrop itself, not on its children
+    if (e.target === e.currentTarget) {
+        onClose();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center">
-      <div className={`bg-slate-800 rounded-lg shadow-xl w-full m-4 border border-slate-700 ${sizeClasses[size]}`}>
-        <div className="flex justify-between items-center p-4 border-b border-slate-700">
-          <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">&times;</button>
+    <div 
+        className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center"
+        onClick={handleBackdropClick}
+    >
+      <div className={`bg-secondary rounded-lg shadow-xl w-full m-4 border border-secondary ${sizeClasses[size]}`}>
+        <div className="flex justify-between items-center p-4 border-b border-secondary">
+          <h3 className="text-xl font-semibold text-primary">{title}</h3>
+          <button onClick={onClose} className="text-secondary hover:text-primary transition-colors">&times;</button>
         </div>
         <div className="p-6">
           {children}
@@ -211,22 +232,22 @@ export const EditTaskForm: React.FC<EditTaskFormProps> = ({ task, onSave, onCanc
     return (
         <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
              <div>
-                <label htmlFor="id" className="block text-sm font-medium text-slate-400">Task ID</label>
-                <input type="text" name="id" value={formData.id} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                <label htmlFor="id" className="block text-sm font-medium text-secondary">Task ID</label>
+                <input type="text" name="id" value={formData.id} onChange={handleChange} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" />
             </div>
             <div>
-                <label htmlFor="description" className="block text-sm font-medium text-slate-400">Description</label>
-                <textarea name="description" value={formData.description} onChange={handleChange} rows={3} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
+                <label htmlFor="description" className="block text-sm font-medium text-secondary">Description</label>
+                <textarea name="description" value={formData.description} onChange={handleChange} rows={3} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none"></textarea>
             </div>
              <div>
-                <label htmlFor="priority" className="block text-sm font-medium text-slate-400">Priority</label>
-                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                <label htmlFor="priority" className="block text-sm font-medium text-secondary">Priority</label>
+                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none">
                     {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
             </div>
             <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-md transition-colors">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">Save Changes</button>
+                <button type="button" onClick={onCancel} className="px-4 py-2 bg-tertiary hover:bg-hover rounded-md transition-colors">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-accent hover:bg-accent-hover rounded-md transition-colors text-accent-text">Save Changes</button>
             </div>
         </form>
     );
@@ -314,42 +335,42 @@ export const ImplementTaskForm: React.FC<ImplementTaskFormProps> = ({ initialDes
     return (
         <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
             <div>
-                <label htmlFor="phase" className="block text-sm font-medium text-slate-400">Phase Name</label>
-                <input type="text" list="phases" name="phase" value={formData.phase} onChange={handleChange} placeholder="e.g., Backend" className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                <label htmlFor="phase" className="block text-sm font-medium text-secondary">Phase Name</label>
+                <input type="text" list="phases" name="phase" value={formData.phase} onChange={handleChange} placeholder="e.g., Backend" className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required />
                 <datalist id="phases">
                     {existingPhases.map(p => <option key={p} value={p} />)}
                 </datalist>
             </div>
             <div>
-                <label htmlFor="subPhase" className="block text-sm font-medium text-slate-400">Sub-Phase Name</label>
-                <input type="text" list="subphases" name="subPhase" value={formData.subPhase} onChange={handleChange} placeholder="e.g., Database" className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                <label htmlFor="subPhase" className="block text-sm font-medium text-secondary">Sub-Phase Name</label>
+                <input type="text" list="subphases" name="subPhase" value={formData.subPhase} onChange={handleChange} placeholder="e.g., Database" className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required />
                 <datalist id="subphases">
                     {existingSubPhases.map(sp => <option key={sp} value={sp} />)}
                 </datalist>
             </div>
             <div>
-                <label htmlFor="id" className="block text-sm font-medium text-slate-400">Task ID</label>
-                <input type="text" name="id" value={formData.id} onChange={handleChange} placeholder="e.g., DB-02 (auto-generates for existing sub-phases)" className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                <label htmlFor="id" className="block text-sm font-medium text-secondary">Task ID</label>
+                <input type="text" name="id" value={formData.id} onChange={handleChange} placeholder="e.g., DB-02 (auto-generates for existing sub-phases)" className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required />
             </div>
             <div>
-                <label htmlFor="description" className="block text-sm font-medium text-slate-400">Task Description</label>
-                <textarea name="description" value={formData.description} onChange={handleChange} rows={4} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required></textarea>
+                <label htmlFor="description" className="block text-sm font-medium text-secondary">Task Description</label>
+                <textarea name="description" value={formData.description} onChange={handleChange} rows={4} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required></textarea>
             </div>
             <div>
-                <label htmlFor="priority" className="block text-sm font-medium text-slate-400">Priority</label>
-                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                <label htmlFor="priority" className="block text-sm font-medium text-secondary">Priority</label>
+                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none">
                     {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
             </div>
             <div>
-                <label htmlFor="status" className="block text-sm font-medium text-slate-400">Status</label>
-                <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded-md p-2 mt-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                <label htmlFor="status" className="block text-sm font-medium text-secondary">Status</label>
+                <select name="status" value={formData.status} onChange={handleChange} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none">
                     {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
             </div>
             <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-600 hover:bg-slate-700 rounded-md transition-colors">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors">Create Task</button>
+                <button type="button" onClick={onCancel} className="px-4 py-2 bg-tertiary hover:bg-hover rounded-md transition-colors">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-accent hover:bg-accent-hover text-accent-text rounded-md transition-colors">Create Task</button>
             </div>
         </form>
     );
@@ -357,7 +378,7 @@ export const ImplementTaskForm: React.FC<ImplementTaskFormProps> = ({ initialDes
 
 // --- HELP DOCUMENTATION ---
 export const HelpDocumentation: React.FC = () => (
-    <div className="text-slate-300 max-h-[70vh] overflow-y-auto pr-4 markdown-preview">
+    <div className="text-secondary max-h-[70vh] overflow-y-auto pr-4 markdown-preview">
         <h1>Zenith Help Documentation</h1>
         <p>Welcome to Zenith! Here's a guide to the core features.</p>
         
@@ -366,6 +387,7 @@ export const HelpDocumentation: React.FC = () => (
         <ul>
             <li><strong>Show Tutorial Project:</strong> Use the checkbox at the top to show or hide the interactive tutorial project.</li>
             <li><strong>Backup & Import:</strong> Hover over a project to find the backup icon. Use the import icon in the header to upload project data from a `.zip` file or individual `.md` files.</li>
+            <li><strong>Settings:</strong> Click the gear icon to change the application's color theme.</li>
         </ul>
 
         <h2>Project View</h2>
@@ -381,7 +403,7 @@ export const HelpDocumentation: React.FC = () => (
 
         <h3>Implementation Plan Formatting</h3>
         <p>To create tasks, use this specific format:</p>
-        <pre className="text-xs bg-slate-900 p-2 rounded font-mono whitespace-pre-wrap">
+        <pre className="text-xs bg-primary p-2 rounded font-mono whitespace-pre-wrap">
             <code>
 {`# Status (e.g., To-Do, In Progress)
 ## Phase Name (e.g., Backend)
@@ -389,7 +411,7 @@ export const HelpDocumentation: React.FC = () => (
             </code>
         </pre>
         <p>Example:</p>
-        <pre className="text-xs bg-slate-900 p-2 rounded font-mono whitespace-pre-wrap">
+        <pre className="text-xs bg-primary p-2 rounded font-mono whitespace-pre-wrap">
             <code>
 {`# To-Do
 ## Frontend

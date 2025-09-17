@@ -22,16 +22,191 @@
 }
 </script>
     <style>
-      .markdown-preview h1 { font-size: 1.5rem; font-weight: 700; border-bottom: 1px solid #475569; padding-bottom: 0.5rem; margin: 1.5rem 0 1rem; }
-      .markdown-preview h2 { font-size: 1.25rem; font-weight: 600; border-bottom: 1px solid #475569; padding-bottom: 0.4rem; margin: 1.5rem 0 1rem; }
-      .markdown-preview p { margin-bottom: 0.75rem; line-height: 1.6; }
-      .markdown-preview ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
-      .markdown-preview li { margin-bottom: 0.25rem; }
-      .markdown-preview strong { font-weight: 600; color: #e2e8f0; }
-      .markdown-preview em { font-style: italic; color: #cbd5e1; }
+      :root, [data-theme='dark'] {
+        --color-bg-primary: #0f172a;
+        --color-bg-secondary: #1e293b;
+        --color-bg-tertiary: #334155;
+        --color-bg-hover: #475569;
+        --color-text-primary: #f1f5f9;
+        --color-text-secondary: #94a3b8;
+        --color-border-primary: #334155;
+        --color-border-secondary: #475569;
+        --color-accent: #38bdf8;
+        --color-accent-hover: #0ea5e9;
+        --color-accent-text: #ffffff;
+        --color-special-purple: #a855f7;
+        --color-special-pink: #ec4899;
+      }
+      [data-theme='light'] {
+        --color-bg-primary: #ffffff;
+        --color-bg-secondary: #f1f5f9;
+        --color-bg-tertiary: #e2e8f0;
+        --color-bg-hover: #cbd5e1;
+        --color-text-primary: #1e293b;
+        --color-text-secondary: #475569;
+        --color-border-primary: #e2e8f0;
+        --color-border-secondary: #cbd5e1;
+        --color-accent: #2563eb;
+        --color-accent-hover: #1d4ed8;
+      }
+      [data-theme='catppuccin'] {
+        --color-bg-primary: #1e1e2e;
+        --color-bg-secondary: #181825;
+        --color-bg-tertiary: #313244;
+        --color-bg-hover: #45475a;
+        --color-text-primary: #cdd6f4;
+        --color-text-secondary: #a6adc8;
+        --color-border-primary: #313244;
+        --color-border-secondary: #45475a;
+        --color-accent: #89b4fa;
+        --color-accent-hover: #74c7ec;
+      }
+      [data-theme='solarized-light'] {
+        --color-bg-primary: #fdf6e3;
+        --color-bg-secondary: #eee8d5;
+        --color-bg-tertiary: #d8d2c0;
+        --color-bg-hover: #c9c2af;
+        --color-text-primary: #586e75;
+        --color-text-secondary: #839496;
+        --color-border-primary: #d8d2c0;
+        --color-border-secondary: #c9c2af;
+        --color-accent: #268bd2;
+        --color-accent-hover: #007bff;
+      }
+      [data-theme='solarized-dark'] {
+        --color-bg-primary: #002b36;
+        --color-bg-secondary: #073642;
+        --color-bg-tertiary: #2a525d;
+        --color-bg-hover: #586e75;
+        --color-text-primary: #eee8d5;
+        --color-text-secondary: #839496;
+        --color-border-primary: #2a525d;
+        --color-border-secondary: #586e75;
+        --color-accent: #268bd2;
+        --color-accent-hover: #2aa198;
+      }
+       [data-theme='high-contrast'] {
+        --color-bg-primary: #000000;
+        --color-bg-secondary: #111111;
+        --color-bg-tertiary: #222222;
+        --color-bg-hover: #333333;
+        --color-text-primary: #ffffff;
+        --color-text-secondary: #eeeeee;
+        --color-border-primary: #444444;
+        --color-border-secondary: #555555;
+        --color-accent: #38bdf8;
+        --color-accent-hover: #0ea5e9;
+      }
+      [data-theme='dracula'] {
+        --color-bg-primary: #282a36;
+        --color-bg-secondary: #21222c;
+        --color-bg-tertiary: #44475a;
+        --color-bg-hover: #6272a4;
+        --color-text-primary: #f8f82;
+        --color-text-secondary: #bd93f9;
+        --color-border-primary: #44475a;
+        --color-border-secondary: #6272a4;
+        --color-accent: #ff79c6;
+        --color-accent-hover: #ff92d0;
+      }
+      [data-theme='nord'] {
+        --color-bg-primary: #2e3440;
+        --color-bg-secondary: #3b4252;
+        --color-bg-tertiary: #434c5e;
+        --color-bg-hover: #4c566a;
+        --color-text-primary: #d8dee9;
+        --color-text-secondary: #e5e9f0;
+        --color-border-primary: #434c5e;
+        --color-border-secondary: #4c566a;
+        --color-accent: #88c0d0;
+        --color-accent-hover: #81a1c1;
+      }
+
+      :root {
+        --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        --font-serif: Georgia, Cambria, 'Times New Roman', Times, serif;
+        --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+
+        --fs-sm: 0.8rem;   --lh-sm: 1.25rem;
+        --fs-base: 0.9rem;  --lh-base: 1.4rem;
+        --fs-lg: 1.05rem; --lh-lg: 1.6rem;
+      }
+
+      /* Custom scrollbar styles */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb {
+        background-color: var(--color-bg-tertiary);
+        border-radius: 4px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+      ::-webkit-scrollbar-thumb:hover { background-color: var(--color-accent); }
+      /* For Firefox */
+      * { scrollbar-width: thin; scrollbar-color: var(--color-bg-tertiary) transparent; }
+
+      body {
+        background-color: var(--color-bg-primary);
+        color: var(--color-text-primary);
+        transition: background-color 0.3s ease, color 0.3s ease;
+        font-family: var(--font-sans);
+        font-size: var(--fs-base);
+        line-height: var(--lh-base);
+      }
+
+      [data-font-family='sans'] { font-family: var(--font-sans); }
+      [data-font-family='serif'] { font-family: var(--font-serif); }
+      [data-font-family='mono'] { font-family: var(--font-mono); }
+
+      [data-font-size='sm'] * { font-size: var(--fs-sm); line-height: var(--lh-sm); }
+      [data-font-size='base'] * { font-size: var(--fs-base); line-height: var(--lh-base); }
+      [data-font-size='lg'] * { font-size: var(--fs-lg); line-height: var(--lh-lg); }
+
+      /* Utility classes */
+      .bg-primary { background-color: var(--color-bg-primary); }
+      .bg-secondary { background-color: var(--color-bg-secondary); }
+      .bg-tertiary { background-color: var(--color-bg-tertiary); }
+      .hover\:bg-hover:hover { background-color: var(--color-bg-hover); }
+
+      .text-primary { color: var(--color-text-primary); }
+      .text-secondary { color: var(--color-text-secondary); }
+      
+      .border-primary { border-color: var(--color-border-primary); }
+      .border-secondary { border-color: var(--color-border-secondary); }
+
+      .bg-accent { background-color: var(--color-accent); }
+      .text-accent { color: var(--color-accent-text); }
+      .hover\:bg-accent-hover:hover { background-color: var(--color-accent-hover); }
+      .focus\:ring-accent:focus {
+        --tw-ring-color: var(--color-accent);
+        --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+        --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+        box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+      }
+      
+      .special-text-gradient {
+        background-image: linear-gradient(to right, var(--color-special-purple), var(--color-special-pink));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .special-text-gradient-alt {
+        background-image: linear-gradient(to right, var(--color-accent), var(--color-accent-hover));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      
+      .markdown-preview h1 { border-bottom-color: var(--color-border-secondary); }
+      .markdown-preview h2 { border-bottom-color: var(--color-border-secondary); }
+      .markdown-preview p { color: var(--color-text-primary); }
+      .markdown-preview ul { color: var(--color-text-secondary); }
+      .markdown-preview strong { color: var(--color-text-primary); }
+      .markdown-preview em { font-style: italic; color: var(--color-text-secondary); }
+      .markdown-preview pre { background-color: var(--color-bg-primary); }
     </style>
   </head>
-  <body class="bg-slate-900 text-white">
+  <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
