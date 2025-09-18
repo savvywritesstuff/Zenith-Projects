@@ -10,6 +10,7 @@ import { TaskListView } from './components/TaskListView';
 import { EditableDocumentPanel, implementationPlanHelpText } from './components/Documents';
 import CommentsView from './components/CommentsView';
 import Tutorial from './components/Tutorial';
+import { FontPreviewer } from './components/FontPreviewer';
 import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, NewTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon, ProjectProgressBar, FolderIcon, AddFolderIcon, GridViewIcon, ListViewIcon, CompletedStamp, Confetti, SearchIcon, FilterIcon, ChevronDownIcon, XIcon } from './components/UI';
 import { getInitialData, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
 import { AppData, saveDataToCookie, loadDataFromCookie, saveSettingsToLocalStorage, loadSettingsFromLocalStorage } from './services/storageService';
@@ -129,6 +130,8 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isTutorialRunning, setIsTutorialRunning] = useState(false);
     const [isAppearanceModalOpen, setIsAppearanceModalOpen] = useState(false);
+    const [isFontPreviewerOpen, setIsFontPreviewerOpen] = useState(false);
+    const [fontTarget, setFontTarget] = useState<'header' | 'body' | null>(null);
     const [confirmRemoveAllCommentsTask, setConfirmRemoveAllCommentsTask] = useState<Task | null>(null);
     const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
     const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
@@ -138,6 +141,11 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
     const [selectedSubPhases, setSelectedSubPhases] = useState<string[]>([]);
     const [selectedPriorities, setSelectedPriorities] = useState<Priority[]>([]);
+    
+    // Title Editing State
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [titleInputValue, setTitleInputValue] = useState(project.name);
+    const titleInputRef = useRef<HTMLInputElement>(null);
 
     const allPhases = useMemo(() => [...new Set(project.tasks.map(t => t.phase))].sort(), [project.tasks]);
     const allSubPhases = useMemo(() => [...new Set(project.tasks.map(t => t.subPhase))].sort(), [project.tasks]);
@@ -228,6 +236,13 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     ], []);
 
     useEffect(() => {
+        if (isEditingTitle && titleInputRef.current) {
+            titleInputRef.current.focus();
+            titleInputRef.current.select();
+        }
+    }, [isEditingTitle]);
+
+    useEffect(() => {
         // When switching document tabs, automatically exit edit mode.
         // The content is already saved in the state on every change.
         setEditingTab(null);
@@ -271,6 +286,21 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
         }
     }, [project, updateProject, isReadOnly]);
     
+    const handleTitleSave = () => {
+        if (!isReadOnly && titleInputValue.trim() && titleInputValue.trim() !== project.name) {
+            updateProject({ ...project, name: titleInputValue.trim() });
+        }
+        setIsEditingTitle(false);
+    };
+
+    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleTitleSave();
+        } else if (e.key === 'Escape') {
+            setTitleInputValue(project.name); // Reset to original name
+            setIsEditingTitle(false);
+        }
+    };
 
     const handleTextSelection = (text: string) => {
       if (isReadOnly) return;
@@ -315,6 +345,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
 
     const handleTaskRightClick = (e: React.MouseEvent, task: Task) => {
         e.preventDefault();
+        e.stopPropagation();
         if (isReadOnly) return;
         setContextMenu({
             x: e.clientX, y: e.clientY,
@@ -455,26 +486,29 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
         setIsAddTaskModalOpen(true);
     };
 
-    const handleBoardRightClick = (e: React.MouseEvent) => {
+    const handleColumnRightClick = (e: React.MouseEvent, status: TaskStatus) => {
         if (isReadOnly) return;
-        if ((e.target as HTMLElement).dataset.boardBackground) {
-            e.preventDefault();
-            setContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                content: (
-                    <button
-                        onClick={() => {
-                            handleOpenAddTaskModal(TaskStatus.Backlog);
-                            setContextMenu(null);
-                        }}
-                        className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-primary hover:bg-hover"
-                    >
-                        <PlusIcon className="h-5 w-5" /> Add New Task
-                    </button>
-                ),
-            });
+        // This check is important to not show the column menu when a task card is right-clicked.
+        // The event from the card bubbles up to the column.
+        if ((e.target as HTMLElement).closest('[data-task-id]')) {
+            return;
         }
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            content: (
+                <button
+                    onClick={() => {
+                        handleOpenAddTaskModal(status);
+                        setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-primary hover:bg-hover"
+                >
+                    <PlusIcon className="h-5 w-5" /> Add New Task to "{status}"
+                </button>
+            ),
+        });
     };
 
     const handleCreateNewTask = (taskData: { id: string; phase: string; subPhase: string; priority: Priority; description: string; status: TaskStatus; }) => {
@@ -495,6 +529,91 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
         setIsAddTaskModalOpen(false);
         setNewTaskInitialData(null);
     };
+    
+    const handleSelectFont = (fontName: string) => {
+        if (!fontTarget) return;
+        
+        const fieldToUpdate = fontTarget === 'header' ? 'headerCustomFont' : 'bodyCustomFont';
+        updateProject({ ...project, [fieldToUpdate]: fontName });
+
+        setIsFontPreviewerOpen(false);
+        setFontTarget(null);
+    };
+
+    const FontSettingsGroup: React.FC<{type: 'header' | 'body'}> = ({ type }) => {
+        const title = type.charAt(0).toUpperCase() + type.slice(1);
+        const fontFamily = project[`${type}FontFamily`] || 'sans';
+        const customFont = project[`${type}CustomFont`] || '';
+        const fontSize = project[`${type}FontSize`] || 'base';
+
+        const handleFamilyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const newFontFamily = e.target.value as FontFamily;
+            const updates: Partial<Project> = { [`${type}FontFamily`]: newFontFamily };
+            if (newFontFamily !== 'custom') {
+                updates[`${type}CustomFont`] = '';
+            }
+            updateProject({ ...project, ...updates });
+        };
+        
+        return (
+            <div>
+                <h4 className="text-lg font-semibold text-primary mb-3">{title} Typography</h4>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-secondary mb-2">
+                            Font Family
+                        </label>
+                        <select
+                            value={fontFamily}
+                            onChange={handleFamilyChange}
+                            className="w-full bg-primary border border-secondary rounded-md p-2 focus:ring-2 focus:ring-accent outline-none"
+                        >
+                            {FONT_FAMILY_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {fontFamily === 'custom' && (
+                        <div className="animate-fade-in-up">
+                             <label className="block text-sm font-medium text-secondary mb-2">
+                                Google Font Name
+                            </label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="e.g., Lato or Source Code Pro"
+                                    value={customFont}
+                                    onChange={(e) => updateProject({ ...project, [`${type}CustomFont`]: e.target.value })}
+                                    className="w-full bg-primary border border-secondary rounded-md p-2 focus:ring-2 focus:ring-accent outline-none"
+                                />
+                                <button
+                                    onClick={() => { setFontTarget(type); setIsFontPreviewerOpen(true); }}
+                                    className="px-4 py-2 bg-tertiary hover:bg-hover text-primary rounded-md transition-colors whitespace-nowrap"
+                                >
+                                    Browse Fonts
+                                </button>
+                            </div>
+                             <p className="text-xs text-secondary mt-1">Enter a font name directly or browse the list for a preview.</p>
+                        </div>
+                    )}
+                     <div>
+                        <label className="block text-sm font-medium text-secondary mb-2">
+                            Font Size
+                        </label>
+                        <select
+                            value={fontSize}
+                            onChange={(e) => updateProject({ ...project, [`${type}FontSize`]: e.target.value as FontSize })}
+                            className="w-full bg-primary border border-secondary rounded-md p-2 focus:ring-2 focus:ring-accent outline-none"
+                        >
+                            {FONT_SIZE_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        )
+    };
 
     return (
         <div className={`h-screen w-screen flex flex-col p-4 bg-primary overflow-hidden ${isReadOnly ? 'pt-12' : ''}`}>
@@ -510,9 +629,31 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
             <header className="flex-shrink-0">
                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <h1 className="text-3xl font-bold special-text-gradient-alt" data-tutorial-id="project-title">
-                            {project.name}
-                        </h1>
+                        {isEditingTitle ? (
+                            <input
+                                ref={titleInputRef}
+                                type="text"
+                                value={titleInputValue}
+                                onChange={(e) => setTitleInputValue(e.target.value)}
+                                onBlur={handleTitleSave}
+                                onKeyDown={handleTitleKeyDown}
+                                className="text-3xl font-bold bg-secondary text-primary rounded-md p-1 -m-1 font-header outline-none ring-2 ring-accent"
+                            />
+                        ) : (
+                            <h1 
+                                className={`text-3xl font-bold special-text-gradient-alt font-header ${!isReadOnly ? 'cursor-pointer' : ''}`}
+                                data-tutorial-id="project-title"
+                                onDoubleClick={() => {
+                                    if (!isReadOnly) {
+                                        setTitleInputValue(project.name);
+                                        setIsEditingTitle(true);
+                                    }
+                                }}
+                                title={isReadOnly ? project.name : "Double-click to rename"}
+                            >
+                                {project.name}
+                            </h1>
+                        )}
                          <button onClick={() => setIsAppearanceModalOpen(true)} title="Appearance Settings" className="text-secondary hover:text-primary transition-colors">
                            <SettingsIcon />
                         </button>
@@ -622,7 +763,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                                 onTaskDrillDown={onTaskDrillDown}
                                 onUpdateCommentStatus={handleUpdateCommentStatus}
                                 onAddNewTask={handleOpenAddTaskModal}
-                                onBoardRightClick={handleBoardRightClick}
+                                onColumnRightClick={handleColumnRightClick}
                             />
                          ) : (
                             <TaskListView
@@ -703,37 +844,16 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label htmlFor="font-family-select" className="block text-sm font-medium text-secondary mb-2">
-                            Font Family
-                        </label>
-                        <select
-                            id="font-family-select"
-                            value={project.fontFamily || 'sans'}
-                            onChange={(e) => updateProject({ ...project, fontFamily: e.target.value as FontFamily })}
-                            className="w-full bg-primary border border-secondary rounded-md p-2 focus:ring-2 focus:ring-accent outline-none"
-                        >
-                            {FONT_FAMILY_OPTIONS.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
+                    <div className="border-t border-secondary pt-4">
+                        <FontSettingsGroup type="header" />
                     </div>
-                     <div>
-                        <label htmlFor="font-size-select" className="block text-sm font-medium text-secondary mb-2">
-                            Font Size
-                        </label>
-                        <select
-                            id="font-size-select"
-                            value={project.fontSize || 'base'}
-                            onChange={(e) => updateProject({ ...project, fontSize: e.target.value as FontSize })}
-                            className="w-full bg-primary border border-secondary rounded-md p-2 focus:ring-2 focus:ring-accent outline-none"
-                        >
-                            {FONT_SIZE_OPTIONS.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
+                     <div className="border-t border-secondary pt-4">
+                        <FontSettingsGroup type="body" />
                     </div>
                 </div>
+            </Modal>
+             <Modal isOpen={isFontPreviewerOpen} onClose={() => setIsFontPreviewerOpen(false)} title="Browse Google Fonts" size="md">
+                <FontPreviewer onSelectFont={handleSelectFont} />
             </Modal>
              <Modal isOpen={!!confirmRemoveAllCommentsTask} onClose={() => setConfirmRemoveAllCommentsTask(null)} title={`Remove all comments from ${confirmRemoveAllCommentsTask?.id}?`}>
                 <div className="space-y-4">
@@ -749,8 +869,8 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
             {fullScreenTab && (
                 <EditableDocumentPanel {...getDocumentProps(fullScreenTab)} />
             )}
-             <Modal isOpen={isCompletionModalOpen} onClose={() => setIsCompletionModalOpen(false)} title="Congratulations!">
-                <Confetti />
+            {isCompletionModalOpen && <Confetti />}
+            <Modal isOpen={isCompletionModalOpen} onClose={() => setIsCompletionModalOpen(false)} title="Congratulations!">
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-primary mb-2">Project Completed!</h2>
                     <p className="text-secondary mb-6">You've finished all tasks in "{project.name}". What's next?</p>
@@ -1092,7 +1212,7 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
         <div className="min-h-screen bg-primary flex flex-col items-center p-8">
             <header className="w-full max-w-5xl mb-10">
                 <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-5xl font-bold special-text-gradient">
+                    <h1 className="text-5xl font-bold special-text-gradient font-header">
                         {isArchiveView ? "Archived Projects" : (currentFolder ? currentFolder.name : "Zenith Projects")}
                     </h1>
                     <div className="flex items-center gap-2 text-secondary">
@@ -1203,7 +1323,7 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
                             >
                                 <div className="flex items-center gap-3">
                                     <FolderIcon />
-                                    <h2 className="text-xl font-bold text-primary truncate">{folder.name}</h2>
+                                    <h2 className="text-xl font-bold text-primary truncate font-header">{folder.name}</h2>
                                 </div>
                             </div>
                         )
@@ -1234,7 +1354,7 @@ const Dashboard: React.FC<DashboardProps> = ({ appData, settings, onUpdateProjec
                                 className={`${baseClasses} ${viewType === 'grid' ? gridClasses : listClasses} ${stateClasses}`}
                             >
                                 <div>
-                                    <h2 className="text-xl font-bold text-primary truncate">{project.name}</h2>
+                                    <h2 className="text-xl font-bold text-primary truncate font-header">{project.name}</h2>
                                     <p className="text-secondary text-sm mt-1">{project.tasks.length} tasks</p>
                                 </div>
                                 <div className={viewType === 'grid' ? 'w-full' : 'w-1/3'}>
@@ -1640,19 +1760,82 @@ const App: React.FC = () => {
     }, [settings.backupFrequency, settings.lastBackupAllDate, appData.projects]);
 
 
+    // Effect to manage custom Google Font injection
+    useEffect(() => {
+        const fontsToLoad = new Set<string>();
+        if (activeProject?.headerFontFamily === 'custom' && activeProject.headerCustomFont) {
+            fontsToLoad.add(activeProject.headerCustomFont.trim());
+        }
+        if (activeProject?.bodyFontFamily === 'custom' && activeProject.bodyCustomFont) {
+            fontsToLoad.add(activeProject.bodyCustomFont.trim());
+        }
+
+        const validFonts = Array.from(fontsToLoad).filter(Boolean);
+
+        if (validFonts.length > 0) {
+            const familyParams = validFonts.map(font => `family=${encodeURIComponent(font)}:wght@400;700`).join('&');
+            const fontUrl = `https://fonts.googleapis.com/css2?${familyParams}&display=swap`;
+            
+            let linkEl = document.getElementById('google-font-link') as HTMLLinkElement;
+            if (!linkEl) {
+                linkEl = document.createElement('link');
+                linkEl.id = 'google-font-link';
+                linkEl.rel = 'stylesheet';
+                document.head.appendChild(linkEl);
+            }
+            if (linkEl.href !== fontUrl) {
+                linkEl.href = fontUrl;
+            }
+
+            let styleEl = document.getElementById('custom-font-style');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'custom-font-style';
+                document.head.appendChild(styleEl);
+            }
+            
+            let styleContent = '';
+            if (activeProject?.headerFontFamily === 'custom' && activeProject.headerCustomFont) {
+                styleContent += `
+                  html[data-header-font-family='custom'] {
+                    --font-header: "${activeProject.headerCustomFont}", var(--font-sans);
+                  }
+                `;
+            }
+            if (activeProject?.bodyFontFamily === 'custom' && activeProject.bodyCustomFont) {
+                styleContent += `
+                  html[data-body-font-family='custom'] {
+                    --font-body: "${activeProject.bodyCustomFont}", var(--font-sans);
+                  }
+                `;
+            }
+            styleEl.innerHTML = styleContent;
+
+        } else {
+            const linkEl = document.getElementById('google-font-link');
+            if (linkEl) linkEl.remove();
+            const styleEl = document.getElementById('custom-font-style');
+            if (styleEl) styleEl.remove();
+        }
+    }, [activeProject]);
+
     useEffect(() => {
         // This effect ensures the correct theme and appearance settings are applied
         // when switching between the dashboard and a project view.
         const root = document.documentElement;
         if (activeProject) {
             root.setAttribute('data-theme', activeProject.theme || settings.dashboardTheme);
-            root.setAttribute('data-font-family', activeProject.fontFamily || 'sans');
-            root.setAttribute('data-font-size', activeProject.fontSize || 'base');
+            root.setAttribute('data-header-font-family', activeProject.headerFontFamily || 'sans');
+            root.setAttribute('data-header-font-size', activeProject.headerFontSize || 'base');
+            root.setAttribute('data-body-font-family', activeProject.bodyFontFamily || 'sans');
+            root.setAttribute('data-body-font-size', activeProject.bodyFontSize || 'base');
         } else {
             // Reset to dashboard settings
             root.setAttribute('data-theme', settings.dashboardTheme);
-            root.setAttribute('data-font-family', 'sans');
-            root.setAttribute('data-font-size', 'base');
+            root.setAttribute('data-header-font-family', 'sans');
+            root.setAttribute('data-header-font-size', 'base');
+            root.setAttribute('data-body-font-family', 'sans');
+            root.setAttribute('data-body-font-size', 'base');
         }
     }, [activeProject, settings.dashboardTheme]);
 
@@ -1693,8 +1876,12 @@ const App: React.FC = () => {
             tasks: [],
             comments: [],
             theme: settings.applyThemeToAllProjects ? settings.dashboardTheme : 'dark',
-            fontFamily: 'sans',
-            fontSize: 'base',
+            headerFontFamily: 'sans',
+            headerCustomFont: '',
+            headerFontSize: 'base',
+            bodyFontFamily: 'sans',
+            bodyCustomFont: '',
+            bodyFontSize: 'base',
             phaseColors: {},
             subPhaseColors: {},
             isArchived: false,
@@ -1731,8 +1918,12 @@ const App: React.FC = () => {
                 tasks: [],
                 comments: [],
                 theme: settings.applyThemeToAllProjects ? settings.dashboardTheme : 'dark',
-                fontFamily: 'sans',
-                fontSize: 'base',
+                headerFontFamily: 'sans',
+                headerCustomFont: '',
+                headerFontSize: 'base',
+                bodyFontFamily: 'sans',
+                bodyCustomFont: '',
+                bodyFontSize: 'base',
                 phaseColors: {},
                 subPhaseColors: {},
                  isArchived: false,
@@ -1786,8 +1977,12 @@ const App: React.FC = () => {
             tasks: [],
             comments: [],
             theme: parentProject?.theme || 'dark',
-            fontFamily: parentProject?.fontFamily || 'sans',
-            fontSize: parentProject?.fontSize || 'base',
+            headerFontFamily: parentProject?.headerFontFamily || 'sans',
+            headerCustomFont: parentProject?.headerFontFamily === 'custom' ? parentProject?.headerCustomFont : '',
+            headerFontSize: parentProject?.headerFontSize || 'base',
+            bodyFontFamily: parentProject?.bodyFontFamily || 'sans',
+            bodyCustomFont: parentProject?.bodyFontFamily === 'custom' ? parentProject?.bodyCustomFont : '',
+            bodyFontSize: parentProject?.bodyFontSize || 'base',
             phaseColors: {},
             subPhaseColors: {},
             isArchived: false,

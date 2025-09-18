@@ -13,11 +13,12 @@ export const THEME_OPTIONS: { value: Theme; label: string }[] = [
     { value: 'nord', label: 'Nord' },
 ];
 
-export type FontFamily = 'sans' | 'serif' | 'mono';
+export type FontFamily = 'sans' | 'serif' | 'mono' | 'custom';
 export const FONT_FAMILY_OPTIONS: { value: FontFamily; label: string }[] = [
     { value: 'sans', label: 'Sans-Serif' },
     { value: 'serif', label: 'Serif' },
     { value: 'mono', label: 'Monospace' },
+    { value: 'custom', label: 'Custom (Google Font)' },
 ];
 
 export type FontSize = 'sm' | 'base' | 'lg';
@@ -90,8 +91,12 @@ export interface Project {
   phaseColors: Record<string, string>;
   subPhaseColors: Record<string, string>;
   theme?: Theme;
-  fontFamily?: FontFamily;
-  fontSize?: FontSize;
+  headerFontFamily?: FontFamily;
+  headerCustomFont?: string;
+  headerFontSize?: FontSize;
+  bodyFontFamily?: FontFamily;
+  bodyCustomFont?: string;
+  bodyFontSize?: FontSize;
   lastBackupDate?: string; // ISO 8601
   folderId?: string | null; // null for root
   labelIds?: string[];

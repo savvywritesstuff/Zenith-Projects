@@ -1,4 +1,4 @@
-import { Project, Folder, Label, AppSettings } from '../types';
+import { Project, Folder, Label, AppSettings, FontFamily, FontSize } from '../types';
 
 export interface AppData {
     projects: Project[];
@@ -55,8 +55,32 @@ export const loadDataFromCookie = (): AppData | null => {
             const data = JSON.parse(dataJson);
             // Perform a basic check to ensure the data is in the expected format
             if (data && Array.isArray(data.projects)) {
+                 // --- MIGRATION LOGIC ---
+                 const migratedProjects = data.projects.map((p: Project & { fontFamily?: FontFamily, customFont?: string, fontSize?: FontSize }) => {
+                     // Check if old properties exist
+                     if ('fontFamily' in p || 'customFont' in p || 'fontSize' in p) {
+                         const newProject: Project = { ...p };
+                         newProject.bodyFontFamily = p.fontFamily || 'sans';
+                         newProject.bodyCustomFont = p.customFont || '';
+                         newProject.bodyFontSize = p.fontSize || 'base';
+                         
+                         // Set default header fonts
+                         newProject.headerFontFamily = 'sans';
+                         newProject.headerCustomFont = '';
+                         newProject.headerFontSize = 'base';
+
+                         // Delete old properties
+                         delete (newProject as any).fontFamily;
+                         delete (newProject as any).customFont;
+                         delete (newProject as any).fontSize;
+                         
+                         return newProject;
+                     }
+                     return p;
+                 });
+
                  return {
-                    projects: data.projects,
+                    projects: migratedProjects,
                     folders: data.folders || [],
                     labels: data.labels || [],
                 };

@@ -285,7 +285,7 @@ export const EditableDocumentPanel: React.FC<EditableDocumentPanelProps> = ({ ti
         />
       ) : (
         <div 
-          className="w-full flex-grow min-h-0 text-primary font-sans overflow-y-auto markdown-preview p-3"
+          className="w-full flex-grow min-h-0 text-primary overflow-y-auto markdown-preview p-3"
           onContextMenu={onContextMenu}
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />

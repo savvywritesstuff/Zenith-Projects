@@ -151,20 +151,35 @@ export const CompletedStamp: React.FC = () => (
 const CONFETTI_COLORS = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
 
 export const Confetti: React.FC = () => {
-    const confettiCount = 100;
+    const confettiCount = 150;
     const pieces = useMemo(() => {
         return Array.from({ length: confettiCount }).map((_, i) => {
+            const duration = Math.random() * 3 + 4; // 4-7s duration
+            const delay = Math.random() * 1.5; // Stagger start times
             const style = {
-                left: `${Math.random() * 100}%`,
+                // A small initial horizontal offset from the center point
+                '--start-x': `${(Math.random() - 0.5) * 50}px`,
+                // Horizontal spread at the peak
+                '--end-x': `${(Math.random() - 0.5) * window.innerWidth * 1.2}px`,
+                // Peak height, between 50% and 90% of viewport height
+                '--end-y': `${-(Math.random() * window.innerHeight * 0.4 + window.innerHeight * 0.5)}px`,
+                '--rotation': `${(Math.random() - 0.5) * 1080}deg`,
+                // Sideways drift during fall
+                '--fall-x': `${(Math.random() - 0.5) * window.innerWidth * 0.2}px`,
                 backgroundColor: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
-                animationDelay: `${Math.random() * 5}s`,
-                animationDuration: `${3 + Math.random() * 2}s`,
-            };
+                animationDuration: `${duration}s`,
+                animationDelay: `${delay}s`,
+                left: '50%',
+                bottom: 0,
+                width: Math.random() > 0.5 ? '10px' : '8px',
+                height: Math.random() > 0.5 ? '20px' : '15px',
+            } as React.CSSProperties;
+
             return <div key={i} className="confetti-piece" style={style} />;
         });
     }, []);
 
-    return <div className="absolute inset-0 pointer-events-none overflow-hidden z-[60]">{pieces}</div>;
+    return <div className="fixed inset-0 pointer-events-none z-[1001]">{pieces}</div>;
 };
 
 

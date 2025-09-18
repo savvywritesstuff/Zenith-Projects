@@ -79,16 +79,59 @@ export const parseImplementationPlan = (text: string): Task[] => {
     } else if (trimmedLine.startsWith('## ')) {
       currentPhase = trimmedLine.substring(3).trim();
     } else if (trimmedLine.startsWith('- ')) {
-       const parts = trimmedLine.substring(2).split(',').map(p => p.trim());
+      const content = trimmedLine.substring(2);
       
-      // Create a task even if it's incomplete for real-time feedback
-      const [subPhase, id, description, priority] = parts;
+      // Improved parsing logic to handle commas in description
+      // Format: SubPhase, Task-ID, Description..., Priority
+      const parts = content.split(',');
+
+      // Must have at least sub-phase and ID
+      if (parts.length < 2) {
+          tasks.push({
+              subPhase: parts[0]?.trim() || '',
+              id: `partial-${lineIndex}`,
+              description: '...',
+              priority: Priority.None,
+              status: currentStatus,
+              phase: currentPhase,
+          });
+          return;
+      }
+
+      const subPhase = parts[0].trim();
+      const id = parts[1].trim();
+      
+      if (parts.length === 2) {
+           tasks.push({
+              subPhase,
+              id,
+              description: '...',
+              priority: Priority.None,
+              status: currentStatus,
+              phase: currentPhase,
+          });
+          return;
+      }
+
+      const lastPart = parts[parts.length - 1].trim();
+      const priorities = Object.values(Priority) as string[];
+
+      let description: string;
+      let priority: Priority;
+
+      if (priorities.includes(lastPart)) {
+          priority = getPriorityFromString(lastPart);
+          description = parts.slice(2, -1).join(',').trim();
+      } else {
+          priority = Priority.None;
+          description = parts.slice(2).join(',').trim();
+      }
+
       tasks.push({
-        subPhase: subPhase || '',
-        // Use the line index to create a stable key for partial tasks
-        id: id || `partial-${lineIndex}`, 
+        subPhase: subPhase,
+        id: id,
         description: description || '...',
-        priority: getPriorityFromString(priority || 'None'),
+        priority: priority,
         status: currentStatus,
         phase: currentPhase,
       });
@@ -120,9 +163,18 @@ export const generateImplementationPlanText = (tasks: Task[]): string => {
       }, {} as Record<string, Task[]>);
 
       Object.keys(groupedByPhase).forEach(phase => {
-        text += `## ${phase}\n`;
+        if (phase !== 'General' || Object.keys(groupedByPhase).length > 1) {
+            text += `## ${phase}\n`;
+        }
         groupedByPhase[phase]!.forEach(task => {
-          text += `- ${task.subPhase}, ${task.id}, ${task.description}, ${task.priority}\n`;
+          let taskLine = `- ${task.subPhase}, ${task.id}`;
+          if (task.description && task.description !== '...') {
+              taskLine += `, ${task.description}`;
+          }
+          if (task.priority !== Priority.None) {
+              taskLine += `, ${task.priority}`;
+          }
+          text += `${taskLine}\n`;
         });
         text += '\n';
       });
@@ -136,7 +188,7 @@ export const generateImplementationPlanText = (tasks: Task[]): string => {
 // --- TUTORIAL PROJECT ---
 const tutorialImplementationPlan = `# To-Do
 ## 📝 The Basics: Documents
-- Edit Plan, TUT-01, Edit the text of this task right here in this document. Notice the card on the right updates instantly!, Medium
+- Edit Plan, TUT-01, This task's description has a comma, and that's okay! Try editing it right here., Medium
 - Create Task, TUT-02, Highlight some text in the 'Planning Document' (left panel), right-click, and choose 'Implement Task'., High
 
 ## Kanban Power
@@ -182,8 +234,12 @@ export const getTutorialProject = (): Project => {
         tasks: initialTasks,
         comments: [],
         theme,
-        fontFamily: 'sans',
-        fontSize: 'base',
+        headerFontFamily: 'sans',
+        headerCustomFont: '',
+        headerFontSize: 'base',
+        bodyFontFamily: 'sans',
+        bodyCustomFont: '',
+        bodyFontSize: 'base',
         phaseColors,
         subPhaseColors,
         isArchived: false,

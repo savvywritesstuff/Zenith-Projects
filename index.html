@@ -122,10 +122,13 @@
         --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
         --font-serif: Georgia, Cambria, 'Times New Roman', Times, serif;
         --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+        
+        --font-header: var(--font-sans);
+        --font-body: var(--font-sans);
 
-        --fs-sm: 0.8rem;   --lh-sm: 1.25rem;
-        --fs-base: 0.9rem;  --lh-base: 1.4rem;
-        --fs-lg: 1.05rem; --lh-lg: 1.6rem;
+        --fs-body-sm: 0.8rem;   --lh-body-sm: 1.25rem;
+        --fs-body-base: 0.9rem;  --lh-body-base: 1.4rem;
+        --fs-body-lg: 1.05rem; --lh-body-lg: 1.6rem;
       }
 
       /* Custom scrollbar styles */
@@ -145,18 +148,42 @@
         background-color: var(--color-bg-primary);
         color: var(--color-text-primary);
         transition: background-color 0.3s ease, color 0.3s ease;
-        font-family: var(--font-sans);
-        font-size: var(--fs-base);
-        line-height: var(--lh-base);
+        font-family: var(--font-body);
+        font-size: var(--fs-body-base);
+        line-height: var(--lh-body-base);
       }
 
-      [data-font-family='sans'] { font-family: var(--font-sans); }
-      [data-font-family='serif'] { font-family: var(--font-serif); }
-      [data-font-family='mono'] { font-family: var(--font-mono); }
+      html[data-body-font-family='sans'] { --font-body: var(--font-sans); }
+      html[data-body-font-family='serif'] { --font-body: var(--font-serif); }
+      html[data-body-font-family='mono'] { --font-body: var(--font-mono); }
+      
+      html[data-header-font-family='sans'] { --font-header: var(--font-sans); }
+      html[data-header-font-family='serif'] { --font-header: var(--font-serif); }
+      html[data-header-font-family='mono'] { --font-header: var(--font-mono); }
 
-      [data-font-size='sm'] * { font-size: var(--fs-sm); line-height: var(--lh-sm); }
-      [data-font-size='base'] * { font-size: var(--fs-base); line-height: var(--lh-base); }
-      [data-font-size='lg'] * { font-size: var(--fs-lg); line-height: var(--lh-lg); }
+      html[data-body-font-size='sm'] body { font-size: var(--fs-body-sm); line-height: var(--lh-body-sm); }
+      html[data-body-font-size='base'] body { font-size: var(--fs-body-base); line-height: var(--lh-body-base); }
+      html[data-body-font-size='lg'] body { font-size: var(--fs-body-lg); line-height: var(--lh-body-lg); }
+
+      h1, h2, h3, h4, h5, h6, .font-header {
+        font-family: var(--font-header);
+      }
+      
+      html[data-header-font-size='sm'] .markdown-preview h1 { font-size: 1.6em; }
+      html[data-header-font-size='sm'] .markdown-preview h2 { font-size: 1.4em; }
+      html[data-header-font-size='sm'] .markdown-preview h3 { font-size: 1.15em; }
+      html[data-header-font-size='sm'] .markdown-preview h4 { font-size: 1.05em; }
+      
+      html[data-header-font-size='base'] .markdown-preview h1 { font-size: 1.8em; }
+      html[data-header-font-size='base'] .markdown-preview h2 { font-size: 1.5em; }
+      html[data-header-font-size='base'] .markdown-preview h3 { font-size: 1.25em; }
+      html[data-header-font-size='base'] .markdown-preview h4 { font-size: 1.1em; }
+      
+      html[data-header-font-size='lg'] .markdown-preview h1 { font-size: 2.2em; }
+      html[data-header-font-size='lg'] .markdown-preview h2 { font-size: 1.8em; }
+      html[data-header-font-size='lg'] .markdown-preview h3 { font-size: 1.4em; }
+      html[data-header-font-size='lg'] .markdown-preview h4 { font-size: 1.2em; }
+
 
       /* Utility classes */
       .bg-primary { background-color: var(--color-bg-primary); }
@@ -193,10 +220,10 @@
         color: transparent;
       }
       
-      .markdown-preview h1 { color: var(--color-text-primary); font-size: 1.8em; font-weight: 600; padding-bottom: .3em; margin: 1.5em 0 1em; border-bottom: 1px solid var(--color-border-secondary); }
-      .markdown-preview h2 { color: var(--color-text-primary); font-size: 1.5em; font-weight: 600; padding-bottom: .3em; margin: 1.5em 0 1em; border-bottom: 1px solid var(--color-border-secondary); }
-      .markdown-preview h3 { color: var(--color-text-primary); font-size: 1.25em; font-weight: 600; margin: 1.5em 0 1em; }
-      .markdown-preview h4 { color: var(--color-text-secondary); font-size: 1.1em; font-weight: 600; margin: 1.5em 0 1em; }
+      .markdown-preview h1 { color: var(--color-text-primary); font-weight: 600; padding-bottom: .3em; margin: 1.5em 0 1em; border-bottom: 1px solid var(--color-border-secondary); }
+      .markdown-preview h2 { color: var(--color-text-primary); font-weight: 600; padding-bottom: .3em; margin: 1.5em 0 1em; border-bottom: 1px solid var(--color-border-secondary); }
+      .markdown-preview h3 { color: var(--color-text-primary); font-weight: 600; margin: 1.5em 0 1em; }
+      .markdown-preview h4 { color: var(--color-text-secondary); font-weight: 600; margin: 1.5em 0 1em; }
       .markdown-preview p { color: var(--color-text-primary); line-height: 1.6; margin-bottom: 1em; }
       .markdown-preview ul { color: var(--color-text-primary); margin-left: 1.5rem; list-style-type: disc; margin-bottom: 1em; }
       .markdown-preview li { margin-bottom: 0.5rem; }
@@ -218,18 +245,38 @@
         animation: fade-in-up 0.2s ease-out forwards;
       }
 
-      @keyframes confetti-fall {
-        0% { transform: translateY(-100%) rotateZ(0deg); opacity: 1; }
-        100% { transform: translateY(100vh) rotateZ(720deg); opacity: 0; }
+      @keyframes confetti-flow {
+        0% {
+          transform: translate3d(var(--start-x), 0, 0) rotateZ(0);
+          opacity: 1;
+        }
+        /* 1. Fast upward burst */
+        15% {
+          transform: translate3d(calc(var(--end-x) * 0.2), -50vh, 0) rotateZ(calc(var(--rotation) * 0.2));
+        }
+        /* 2. Slow down and float to the peak */
+        60% {
+          transform: translate3d(var(--end-x), var(--end-y), 0) rotateZ(calc(var(--rotation) * 0.7));
+          opacity: 1;
+        }
+        /* 3. Fall and fade */
+        100% {
+          transform: translate3d(calc(var(--end-x) + var(--fall-x)), 110vh, 0) rotateZ(var(--rotation));
+          opacity: 0;
+        }
       }
 
       .confetti-piece {
         position: absolute;
-        width: 10px;
-        height: 20px;
         background-color: #f00; /* Will be overridden by inline style */
         opacity: 0;
-        animation: confetti-fall 5s linear infinite;
+        animation-name: confetti-flow;
+        animation-timing-function: linear; /* Use linear to give full control to keyframe spacing */
+        animation-fill-mode: forwards; /* Stay at the end state (invisible) */
+      }
+      
+      .writing-mode-vertical-rl {
+        writing-mode: vertical-rl;
       }
     </style>
   </head>

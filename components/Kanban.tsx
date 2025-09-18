@@ -165,10 +165,12 @@ interface KanbanColumnProps {
   onDoubleClick: (task: Task) => void;
   onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
   onAddNewTask: (status: TaskStatus) => void;
+  onColumnRightClick: (e: React.MouseEvent<HTMLDivElement>, status: TaskStatus) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus, onAddNewTask }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus, onAddNewTask, onColumnRightClick }) => {
   const [isOver, setIsOver] = React.useState(false);
+  const isEmpty = tasks.length === 0;
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -181,39 +183,56 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, com
     onDrop(e, status);
     setIsOver(false);
   };
+
+  const isCollapsed = isEmpty && !isOver;
   
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex-shrink-0 w-64 bg-secondary/70 rounded-lg p-3 h-full flex flex-col transition-all duration-300 ${isOver ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
+      onContextMenu={(e) => onColumnRightClick(e, status)}
+      className={`flex-shrink-0 bg-secondary/70 rounded-lg h-full flex flex-col transition-all duration-300 ease-in-out ${
+        isOver ? 'bg-accent/20 ring-2 ring-accent' : ''
+      } ${
+        isCollapsed ? 'w-14 p-2' : 'w-64 p-3'
+      }`}
     >
-      <h3 className="font-bold text-lg mb-4 px-1 flex items-center justify-between text-primary">
-        <div className="flex items-center">
+      <h3
+        className={`font-bold mb-4 px-1 flex items-center text-primary transition-all duration-300 ${
+          isCollapsed ? 'writing-mode-vertical-rl rotate-180 h-full justify-center text-base' : 'text-lg justify-between'
+        }`}
+      >
+        <div className={`flex items-center ${isCollapsed ? 'flex-col-reverse gap-4' : ''}`}>
             {status}
-            <span className="ml-2 text-sm font-normal bg-tertiary text-secondary rounded-full h-6 w-6 flex items-center justify-center">
+            <span className={`text-sm font-normal bg-tertiary text-secondary rounded-full flex items-center justify-center ${
+              isCollapsed ? 'h-8 w-8 text-base' : 'ml-2 h-6 w-6'
+            }`}>
             {tasks.length}
             </span>
         </div>
-        <button onClick={() => onAddNewTask(status)} title={`Add new task to ${status}`} className="text-secondary hover:text-primary transition-colors p-1 rounded-md hover:bg-hover opacity-50 hover:opacity-100 focus:opacity-100">
-            <PlusIcon className="h-5 w-5" />
-        </button>
+        {!isCollapsed && (
+            <button onClick={() => onAddNewTask(status)} title={`Add new task to ${status}`} className="text-secondary hover:text-primary transition-colors p-1 rounded-md hover:bg-hover opacity-50 hover:opacity-100 focus:opacity-100">
+                <PlusIcon className="h-5 w-5" />
+            </button>
+        )}
       </h3>
-      <div className="overflow-y-auto flex-grow pr-2">
-        {tasks.map(task => (
-          <KanbanCard 
-            key={task.id} 
-            task={task} 
-            project={project} 
-            comments={comments.filter(c => c.taskId === task.id)}
-            onDragStart={onDragStart} 
-            onRightClick={onRightClick}
-            onDoubleClick={onDoubleClick}
-            onUpdateCommentStatus={onUpdateCommentStatus}
-          />
-        ))}
-      </div>
+      {!isCollapsed && (
+        <div className="overflow-y-auto flex-grow pr-2">
+            {tasks.map(task => (
+            <KanbanCard 
+                key={task.id} 
+                task={task} 
+                project={project} 
+                comments={comments.filter(c => c.taskId === task.id)}
+                onDragStart={onDragStart} 
+                onRightClick={onRightClick}
+                onDoubleClick={onDoubleClick}
+                onUpdateCommentStatus={onUpdateCommentStatus}
+            />
+            ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -230,10 +249,10 @@ interface KanbanBoardProps {
   onRightClick: (e: React.MouseEvent<HTMLDivElement>, task: Task) => void;
   onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
   onAddNewTask: (status: TaskStatus) => void;
-  onBoardRightClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onColumnRightClick: (e: React.MouseEvent<HTMLDivElement>, status: TaskStatus) => void;
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, comments, onTaskMove, onTaskDrillDown, onUpdateCommentStatus, onAddNewTask, onBoardRightClick, ...rest }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, comments, onTaskMove, onTaskDrillDown, onUpdateCommentStatus, onAddNewTask, onColumnRightClick, ...rest }) => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
     e.dataTransfer.setData('taskId', taskId);
   };
@@ -246,7 +265,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, commen
   };
 
   return (
-    <div className="flex-grow flex p-1 overflow-x-auto h-full" data-tutorial-id="kanban-board" onContextMenu={onBoardRightClick} data-board-background="true">
+    <div className="flex-grow flex p-1 overflow-x-auto h-full" data-tutorial-id="kanban-board">
       {KANBAN_COLUMNS.map((status, index) => (
         <React.Fragment key={status}>
           <KanbanColumn
@@ -259,6 +278,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, commen
             onDoubleClick={onTaskDrillDown}
             onUpdateCommentStatus={onUpdateCommentStatus}
             onAddNewTask={onAddNewTask}
+            onColumnRightClick={onColumnRightClick}
             {...rest}
           />
           {index < KANBAN_COLUMNS.length - 1 && (
