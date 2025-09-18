@@ -6,6 +6,7 @@ import { HiOutlineClipboardDocumentList, HiChevronDoubleLeft, HiChevronDoubleRig
 import { Project, Task, TaskStatus, Priority, TutorialStep, Theme, THEME_OPTIONS, FontFamily, FONT_FAMILY_OPTIONS, FontSize, FONT_SIZE_OPTIONS, Comment, AppSettings, BackupFrequency, Folder, Label, CommentStatus } from './types';
 import { KANBAN_COLUMNS } from './constants';
 import { KanbanBoard } from './components/Kanban';
+import { TaskListView } from './components/TaskListView';
 import { EditableDocumentPanel, implementationPlanHelpText } from './components/Documents';
 import CommentsView from './components/CommentsView';
 import Tutorial from './components/Tutorial';
@@ -129,6 +130,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     const [confirmRemoveAllCommentsTask, setConfirmRemoveAllCommentsTask] = useState<Task | null>(null);
     const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
     const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
+    const [taskView, setTaskView] = useState<'board' | 'list'>('board');
 
     // Filter states
     const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
@@ -309,7 +311,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
         updateTasksAndPlan(newTasks);
     };
 
-    const handleTaskRightClick = (e: React.MouseEvent<HTMLDivElement>, task: Task) => {
+    const handleTaskRightClick = (e: React.MouseEvent, task: Task) => {
         e.preventDefault();
         if (isReadOnly) return;
         setContextMenu({
@@ -527,7 +529,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                         </div>
                     </div>
                 </div>
-                <div className={`flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-full pl-6' : 'w-2/3 pl-4'}`}>
+                <div className={`flex flex-col flex-grow transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-full pl-6' : 'w-2/3 pl-4'}`}>
                     {!isReadOnly && (
                         <div className="flex-shrink-0 flex items-center gap-2 p-2 mb-2 bg-secondary/70 rounded-lg border border-secondary">
                             <FilterIcon />
@@ -541,19 +543,47 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                                     <XIcon /> Clear
                                 </button>
                             )}
+                             <div className="h-5 w-px bg-tertiary mx-2" />
+                             <button
+                                onClick={() => setTaskView('board')}
+                                title="Board View"
+                                className={`p-1.5 rounded-md transition-colors ${taskView === 'board' ? 'bg-accent text-accent-text' : 'text-secondary hover:bg-hover'}`}
+                            >
+                                <GridViewIcon />
+                            </button>
+                            <button
+                                onClick={() => setTaskView('list')}
+                                title="List View"
+                                className={`p-1.5 rounded-md transition-colors ${taskView === 'list' ? 'bg-accent text-accent-text' : 'text-secondary hover:bg-hover'}`}
+                            >
+                                <ListViewIcon />
+                            </button>
                         </div>
                     )}
-                    <KanbanBoard
-                        tasks={filteredTasks}
-                        project={project}
-                        comments={project.comments}
-                        onTaskUpdate={handleTaskUpdate}
-                        onTaskDelete={handleTaskDelete}
-                        onTaskMove={handleTaskMove}
-                        onRightClick={handleTaskRightClick}
-                        onTaskDrillDown={onTaskDrillDown}
-                        onUpdateCommentStatus={handleUpdateCommentStatus}
-                    />
+                    <div className="flex-grow min-h-0">
+                         {taskView === 'board' ? (
+                            <KanbanBoard
+                                tasks={filteredTasks}
+                                project={project}
+                                comments={project.comments}
+                                onTaskUpdate={handleTaskUpdate}
+                                onTaskDelete={handleTaskDelete}
+                                onTaskMove={handleTaskMove}
+                                onRightClick={handleTaskRightClick}
+                                onTaskDrillDown={onTaskDrillDown}
+                                onUpdateCommentStatus={handleUpdateCommentStatus}
+                            />
+                         ) : (
+                            <TaskListView
+                                tasks={filteredTasks}
+                                project={project}
+                                comments={project.comments}
+                                onTaskUpdate={handleTaskUpdate}
+                                onRightClick={handleTaskRightClick}
+                                onTaskDrillDown={onTaskDrillDown}
+                            />
+                         )}
+                    </div>
                 </div>
             </main>
             {contextMenu && (
@@ -1486,14 +1516,55 @@ const App: React.FC = () => {
     }, [showTutorial]);
 
      useEffect(() => {
+        // 1. Never show if frequency is 'never'
         if (settings.backupFrequency === 'never') return;
-        const lastBackup = settings.lastBackupAllDate ? new Date(settings.lastBackupAllDate) : null;
-        if (!lastBackup) {
-            setShowBackupPrompt(true);
+
+        // 2. Find projects eligible for triggering the backup reminder
+        const eligibleProjects = appData.projects.filter(p =>
+            p.id !== 'proj-tutorial' && p.tasks.length > 0
+        );
+        
+        // 3. If no eligible projects exist, don't show the prompt
+        if (eligibleProjects.length === 0) {
+            setShowBackupPrompt(false);
             return;
         }
-        const now = new Date();
-        const daysSinceBackup = (now.getTime() - lastBackup.getTime()) / (1000 * 3600 * 24);
+
+        // 4. Find the creation date of the oldest eligible project from its ID
+        const projectCreationTimestamps = eligibleProjects
+            .map(p => {
+                const parts = p.id.split('-');
+                if (parts[0] === 'proj' && parts.length > 1) {
+                    const timestamp = parseInt(parts[1], 10);
+                    return isNaN(timestamp) ? null : timestamp;
+                }
+                return null;
+            })
+            .filter((ts): ts is number => ts !== null);
+
+        if (projectCreationTimestamps.length === 0) {
+            setShowBackupPrompt(false); // No projects with a valid timestamped ID
+            return;
+        }
+
+        const oldestProjectTimestamp = Math.min(...projectCreationTimestamps);
+        const now = new Date().getTime();
+        const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
+
+        // 5. Only proceed if the oldest eligible project is at least one week old
+        if (now - oldestProjectTimestamp < oneWeekInMs) {
+            setShowBackupPrompt(false);
+            return;
+        }
+        
+        // 6. If grace period is over, apply the original frequency logic
+        const lastBackup = settings.lastBackupAllDate ? new Date(settings.lastBackupAllDate).getTime() : null;
+        if (!lastBackup) {
+            setShowBackupPrompt(true); // First time showing the prompt after the grace period
+            return;
+        }
+
+        const daysSinceBackup = (now - lastBackup) / (1000 * 3600 * 24);
 
         let threshold = Infinity;
         if (settings.backupFrequency === 'daily') threshold = 1;
@@ -1502,8 +1573,10 @@ const App: React.FC = () => {
 
         if (daysSinceBackup > threshold) {
             setShowBackupPrompt(true);
+        } else {
+            setShowBackupPrompt(false);
         }
-    }, [settings.backupFrequency, settings.lastBackupAllDate]);
+    }, [settings.backupFrequency, settings.lastBackupAllDate, appData.projects]);
 
 
     useEffect(() => {
