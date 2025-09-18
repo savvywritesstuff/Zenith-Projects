@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { KANBAN_COLUMNS } from '../constants';
 import { Task, TaskStatus, Priority, Project, Comment, CommentStatus } from '../types';
-import { CommentIndicatorIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon, XIcon } from './UI';
+import { CommentIndicatorIcon, ChevronLeftIcon, ChevronRightIcon, CheckIcon, XIcon, PlusIcon } from './UI';
 
 
 // --- PRIORITY TAG ---
@@ -164,9 +164,10 @@ interface KanbanColumnProps {
   onDrop: (e: React.DragEvent<HTMLDivElement>, status: TaskStatus) => void;
   onDoubleClick: (task: Task) => void;
   onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
+  onAddNewTask: (status: TaskStatus) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus, onAddNewTask }) => {
   const [isOver, setIsOver] = React.useState(false);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -188,11 +189,16 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, com
       onDrop={handleDrop}
       className={`flex-shrink-0 w-64 bg-secondary/70 rounded-lg p-3 h-full flex flex-col transition-all duration-300 ${isOver ? 'bg-accent/20 ring-2 ring-accent' : ''}`}
     >
-      <h3 className="font-bold text-lg mb-4 px-1 flex items-center text-primary">
-        {status}
-        <span className="ml-2 text-sm font-normal bg-tertiary text-secondary rounded-full h-6 w-6 flex items-center justify-center">
-          {tasks.length}
-        </span>
+      <h3 className="font-bold text-lg mb-4 px-1 flex items-center justify-between text-primary">
+        <div className="flex items-center">
+            {status}
+            <span className="ml-2 text-sm font-normal bg-tertiary text-secondary rounded-full h-6 w-6 flex items-center justify-center">
+            {tasks.length}
+            </span>
+        </div>
+        <button onClick={() => onAddNewTask(status)} title={`Add new task to ${status}`} className="text-secondary hover:text-primary transition-colors p-1 rounded-md hover:bg-hover opacity-50 hover:opacity-100 focus:opacity-100">
+            <PlusIcon className="h-5 w-5" />
+        </button>
       </h3>
       <div className="overflow-y-auto flex-grow pr-2">
         {tasks.map(task => (
@@ -223,9 +229,11 @@ interface KanbanBoardProps {
   onTaskDrillDown: (task: Task) => void;
   onRightClick: (e: React.MouseEvent<HTMLDivElement>, task: Task) => void;
   onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
+  onAddNewTask: (status: TaskStatus) => void;
+  onBoardRightClick: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, comments, onTaskMove, onTaskDrillDown, onUpdateCommentStatus, ...rest }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, comments, onTaskMove, onTaskDrillDown, onUpdateCommentStatus, onAddNewTask, onBoardRightClick, ...rest }) => {
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
     e.dataTransfer.setData('taskId', taskId);
   };
@@ -238,7 +246,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, commen
   };
 
   return (
-    <div className="flex-grow flex p-1 overflow-x-auto h-full" data-tutorial-id="kanban-board">
+    <div className="flex-grow flex p-1 overflow-x-auto h-full" data-tutorial-id="kanban-board" onContextMenu={onBoardRightClick} data-board-background="true">
       {KANBAN_COLUMNS.map((status, index) => (
         <React.Fragment key={status}>
           <KanbanColumn
@@ -250,6 +258,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, commen
             onDrop={handleDrop}
             onDoubleClick={onTaskDrillDown}
             onUpdateCommentStatus={onUpdateCommentStatus}
+            onAddNewTask={onAddNewTask}
             {...rest}
           />
           {index < KANBAN_COLUMNS.length - 1 && (

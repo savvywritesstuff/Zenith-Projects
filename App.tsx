@@ -10,7 +10,7 @@ import { TaskListView } from './components/TaskListView';
 import { EditableDocumentPanel, implementationPlanHelpText } from './components/Documents';
 import CommentsView from './components/CommentsView';
 import Tutorial from './components/Tutorial';
-import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon, ProjectProgressBar, FolderIcon, AddFolderIcon, GridViewIcon, ListViewIcon, CompletedStamp, Confetti, SearchIcon, FilterIcon, ChevronDownIcon, XIcon } from './components/UI';
+import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, NewTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon, ProjectProgressBar, FolderIcon, AddFolderIcon, GridViewIcon, ListViewIcon, CompletedStamp, Confetti, SearchIcon, FilterIcon, ChevronDownIcon, XIcon } from './components/UI';
 import { getInitialData, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
 import { AppData, saveDataToCookie, loadDataFromCookie, saveSettingsToLocalStorage, loadSettingsFromLocalStorage } from './services/storageService';
 
@@ -119,6 +119,8 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     const [commentingTask, setCommentingTask] = useState<Task | null>(null);
     const [newComment, setNewComment] = useState('');
     const [isImplementModalOpen, setIsImplementModalOpen] = useState(false);
+    const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+    const [newTaskInitialData, setNewTaskInitialData] = useState<{ status: TaskStatus } | null>(null);
     const [selectedText, setSelectedText] = useState('');
     
     const [activeTab, setActiveTab] = useState<DocumentType>('planning');
@@ -447,6 +449,53 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
         selectProject(null); // Go back to dashboard after restoring
     }
 
+    const handleOpenAddTaskModal = (status: TaskStatus) => {
+        if (isReadOnly) return;
+        setNewTaskInitialData({ status });
+        setIsAddTaskModalOpen(true);
+    };
+
+    const handleBoardRightClick = (e: React.MouseEvent) => {
+        if (isReadOnly) return;
+        if ((e.target as HTMLElement).dataset.boardBackground) {
+            e.preventDefault();
+            setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                content: (
+                    <button
+                        onClick={() => {
+                            handleOpenAddTaskModal(TaskStatus.Backlog);
+                            setContextMenu(null);
+                        }}
+                        className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-primary hover:bg-hover"
+                    >
+                        <PlusIcon className="h-5 w-5" /> Add New Task
+                    </button>
+                ),
+            });
+        }
+    };
+
+    const handleCreateNewTask = (taskData: { id: string; phase: string; subPhase: string; priority: Priority; description: string; status: TaskStatus; }) => {
+        if (isReadOnly) return;
+        if (project.tasks.some(task => task.id.toLowerCase() === taskData.id.toLowerCase())) {
+             alert(`Task ID "${taskData.id}" already exists. Please choose a unique ID.`);
+             return;
+        }
+        const newTask: Task = {
+            id: taskData.id.trim(),
+            description: taskData.description.replace(/\n/g, ' '),
+            status: taskData.status,
+            phase: taskData.phase.trim(),
+            subPhase: taskData.subPhase.trim(),
+            priority: taskData.priority,
+        };
+        updateTasksAndPlan([...project.tasks, newTask]);
+        setIsAddTaskModalOpen(false);
+        setNewTaskInitialData(null);
+    };
+
     return (
         <div className={`h-screen w-screen flex flex-col p-4 bg-primary overflow-hidden ${isReadOnly ? 'pt-12' : ''}`}>
              {isReadOnly && (
@@ -572,6 +621,8 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                                 onRightClick={handleTaskRightClick}
                                 onTaskDrillDown={onTaskDrillDown}
                                 onUpdateCommentStatus={handleUpdateCommentStatus}
+                                onAddNewTask={handleOpenAddTaskModal}
+                                onBoardRightClick={handleBoardRightClick}
                             />
                          ) : (
                             <TaskListView
@@ -618,6 +669,16 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                     allTasks={project.tasks}
                     onSave={handleCreateTaskFromSelection}
                     onCancel={() => setIsImplementModalOpen(false)}
+                />}
+            </Modal>
+             <Modal isOpen={isAddTaskModalOpen} onClose={() => setIsAddTaskModalOpen(false)} title="Add New Task">
+                {isAddTaskModalOpen && <NewTaskForm 
+                    initialStatus={newTaskInitialData!.status}
+                    existingPhases={[...new Set(project.tasks.map(t => t.phase))]}
+                    existingSubPhases={[...new Set(project.tasks.map(t => t.subPhase))]}
+                    allTasks={project.tasks}
+                    onSave={handleCreateNewTask}
+                    onCancel={() => setIsAddTaskModalOpen(false)}
                 />}
             </Modal>
              <Modal isOpen={isAppearanceModalOpen} onClose={() => setIsAppearanceModalOpen(false)} title="Appearance Settings">

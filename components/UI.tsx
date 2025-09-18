@@ -4,8 +4,8 @@ import { HiQuestionMarkCircle } from 'react-icons/hi2';
 import { RiArchiveLine, RiUploadCloud2Line, RiSettings3Line, RiChat1Line, RiChatNewLine, RiInboxUnarchiveLine, RiSave3Line, RiFolderLine, RiFolderAddLine, RiPriceTag3Line, RiChat3Line, RiCheckLine, RiCloseLine, RiArrowLeftSLine, RiArrowRightSLine, RiChatDeleteLine, RiLayoutGridLine, RiListUnordered, RiDeleteBinLine, RiSearchLine, RiFilter3Line, RiArrowDownSLine } from 'react-icons/ri';
 
 // --- ICONS ---
-export const PlusIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+export const PlusIcon = ({ className = "h-6 w-6" }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
   </svg>
 );
@@ -443,6 +443,122 @@ export const ImplementTaskForm: React.FC<ImplementTaskFormProps> = ({ initialDes
         </form>
     );
 };
+
+// --- NEW TASK FORM ---
+interface NewTaskFormProps {
+    initialStatus: TaskStatus;
+    existingPhases: string[];
+    existingSubPhases: string[];
+    allTasks: Task[];
+    onSave: (data: { id: string; phase: string; subPhase: string; priority: Priority; description: string; status: TaskStatus }) => void;
+    onCancel: () => void;
+}
+
+export const NewTaskForm: React.FC<NewTaskFormProps> = ({ initialStatus, existingPhases, existingSubPhases, allTasks, onSave, onCancel }) => {
+    const [formData, setFormData] = React.useState({
+        id: '',
+        description: '',
+        phase: '',
+        subPhase: '',
+        priority: Priority.Medium,
+        status: initialStatus,
+    });
+    const formRef = React.useRef<HTMLFormElement>(null);
+
+    React.useEffect(() => {
+        const subPhase = formData.subPhase;
+        if (subPhase && existingSubPhases.includes(subPhase)) {
+            const tasksInSubPhase = allTasks.filter(t => t.subPhase === subPhase);
+
+            if (tasksInSubPhase.length > 0) {
+                const sampleId = tasksInSubPhase[0].id;
+                const match = sampleId.match(/^([a-zA-Z0-9]+)-(\d+)$/);
+
+                if (match) {
+                    const prefix = match[1];
+                    let maxNum = 0;
+                    
+                    allTasks.forEach(t => {
+                        const taskMatch = t.id.match(new RegExp(`^${prefix}-(\\d+)$`));
+                        if (taskMatch) {
+                            const num = parseInt(taskMatch[1], 10);
+                            if (num > maxNum) maxNum = num;
+                        }
+                    });
+                    
+                    const newNum = maxNum + 1;
+                    const newId = `${prefix}-${String(newNum).padStart(2, '0')}`;
+                    setFormData(prev => ({ ...prev, id: newId }));
+                }
+            }
+        }
+    }, [formData.subPhase, allTasks, existingSubPhases]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (formData.id && formData.phase && formData.subPhase && formData.description) {
+            if (allTasks.some(task => task.id.toLowerCase() === formData.id.toLowerCase())) {
+                 alert(`Task ID "${formData.id}" already exists. Please choose a unique ID.`);
+                 return;
+            }
+            onSave(formData);
+        } else {
+            alert("Task ID, Phase, Sub-Phase, and Description are required.");
+        }
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
+            e.preventDefault();
+            formRef.current?.dispatchEvent(
+                new Event("submit", { cancelable: true, bubbles: true })
+            );
+        }
+    };
+
+    return (
+        <form ref={formRef} onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
+            <div>
+                <label htmlFor="phase" className="block text-sm font-medium text-secondary">Phase Name</label>
+                <input type="text" list="phases" name="phase" value={formData.phase} onChange={handleChange} placeholder="e.g., Backend" className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required autoFocus/>
+                <datalist id="phases">
+                    {existingPhases.map(p => <option key={p} value={p} />)}
+                </datalist>
+            </div>
+            <div>
+                <label htmlFor="subPhase" className="block text-sm font-medium text-secondary">Sub-Phase Name</label>
+                <input type="text" list="subphases" name="subPhase" value={formData.subPhase} onChange={handleChange} placeholder="e.g., Database" className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required />
+                <datalist id="subphases">
+                    {existingSubPhases.map(sp => <option key={sp} value={sp} />)}
+                </datalist>
+            </div>
+            <div>
+                <label htmlFor="id" className="block text-sm font-medium text-secondary">Task ID</label>
+                <input type="text" name="id" value={formData.id} onChange={handleChange} placeholder="e.g., DB-02 (auto-generates for existing sub-phases)" className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required />
+            </div>
+            <div>
+                <label htmlFor="description" className="block text-sm font-medium text-secondary">Task Description</label>
+                <textarea name="description" value={formData.description} onChange={handleChange} rows={4} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none" required></textarea>
+            </div>
+            <div>
+                <label htmlFor="priority" className="block text-sm font-medium text-secondary">Priority</label>
+                <select name="priority" value={formData.priority} onChange={handleChange} className="w-full bg-primary border border-secondary rounded-md p-2 mt-1 focus:ring-2 focus:ring-accent outline-none">
+                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4">
+                <button type="button" onClick={onCancel} className="px-4 py-2 bg-tertiary hover:bg-hover rounded-md transition-colors">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-accent hover:bg-accent-hover text-accent-text rounded-md transition-colors">Create Task</button>
+            </div>
+        </form>
+    );
+};
+
 
 // --- HELP DOCUMENTATION ---
 export const HelpDocumentation: React.FC = () => (
