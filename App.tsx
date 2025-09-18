@@ -1892,11 +1892,11 @@ const App: React.FC = () => {
         }
     }, [activeProject, settings.dashboardTheme]);
 
-    const updateAppData = (updates: Partial<AppData>) => {
+    const updateAppData = useCallback((updates: Partial<AppData>) => {
         setAppData(prev => ({ ...prev, ...updates }));
-    };
+    }, []);
     
-    const handleUpdateSettings = (newSettings: Partial<AppSettings>) => {
+    const handleUpdateSettings = useCallback((newSettings: Partial<AppSettings>) => {
         const updatedSettings = { ...settings, ...newSettings };
         
         const themeChanged = newSettings.dashboardTheme && newSettings.dashboardTheme !== settings.dashboardTheme;
@@ -1904,21 +1904,26 @@ const App: React.FC = () => {
 
         if ((themeChanged && updatedSettings.applyThemeToAllProjects) || toggleEnabled) {
             const newTheme = updatedSettings.dashboardTheme;
-            const updatedProjects = projects.map(p => {
-                const { phaseColors, subPhaseColors } = assignColors(p.tasks, {}, {}, newTheme);
-                return { ...p, theme: newTheme, phaseColors, subPhaseColors };
-            });
-            updateAppData({ projects: updatedProjects });
+            setAppData(prev => ({
+                ...prev,
+                projects: prev.projects.map(p => {
+                    const { phaseColors, subPhaseColors } = assignColors(p.tasks, {}, {}, newTheme);
+                    return { ...p, theme: newTheme, phaseColors, subPhaseColors };
+                })
+            }));
         }
 
         setSettings(updatedSettings);
-    };
+    }, [settings]);
 
-    const handleUpdateProject = (updatedProject: Project) => {
-        updateAppData({ projects: projects.map(p => p.id === updatedProject.id ? updatedProject : p) });
-    };
+    const handleUpdateProject = useCallback((updatedProject: Project) => {
+        setAppData(prev => ({
+            ...prev,
+            projects: prev.projects.map(p => p.id === updatedProject.id ? updatedProject : p)
+        }));
+    }, []);
     
-    const handleAddProject = (name: string, folderId: string | null) => {
+    const handleAddProject = useCallback((name: string, folderId: string | null) => {
         const newProjectId = `proj-${Date.now()}`;
         const newProject: Project = {
             id: newProjectId,
@@ -1947,20 +1952,20 @@ const App: React.FC = () => {
         newProject.phaseColors = phaseColors;
         newProject.subPhaseColors = subPhaseColors;
 
-        updateAppData({ projects: [...projects, newProject] });
+        setAppData(prev => ({ ...prev, projects: [...prev.projects, newProject] }));
         setActiveProjectId(newProjectId);
-    };
+    }, [settings.applyThemeToAllProjects, settings.dashboardTheme]);
 
-    const handleDeleteProject = (id: string) => {
+    const handleDeleteProject = useCallback((id: string) => {
         if (id === 'proj-tutorial') {
             alert("The tutorial project cannot be deleted. You can hide it using the checkbox on the dashboard.");
             return;
         }
-        updateAppData({ projects: projects.filter(p => p.id !== id) });
+        setAppData(prev => ({ ...prev, projects: prev.projects.filter(p => p.id !== id) }));
         setActiveProjectId(null);
-    };
+    }, []);
 
-    const handleImportProject = (data: ImportData) => {
+    const handleImportProject = useCallback((data: ImportData) => {
         if (data.targetProjectId === 'new') {
             const newProject: Project = {
                 id: `proj-${Date.now()}`,
@@ -1988,39 +1993,43 @@ const App: React.FC = () => {
             const { phaseColors, subPhaseColors } = assignColors(newTasks, {}, {}, newProject.theme);
             newProject.phaseColors = phaseColors;
             newProject.subPhaseColors = subPhaseColors;
-            updateAppData({ projects: [...projects, newProject] });
+            setAppData(prev => ({ ...prev, projects: [...prev.projects, newProject] }));
         } else {
-            const updatedProjects = projects.map(p => {
-                if (p.id === data.targetProjectId) {
-                    const updatedProject = {
-                        ...p,
-                        planningDocument: data.documents.planningDocument,
-                        implementationPlan: data.documents.implementationPlan,
-                        scratchpad: data.documents.scratchpad,
-                    };
-                    const newTasks = parseImplementationPlan(updatedProject.implementationPlan);
-                    updatedProject.tasks = newTasks;
-                    const { phaseColors, subPhaseColors } = assignColors(newTasks, p.phaseColors, p.subPhaseColors, p.theme || 'dark');
-                    updatedProject.phaseColors = phaseColors;
-                    updatedProject.subPhaseColors = subPhaseColors;
-                    return updatedProject;
-                }
-                return p;
-            });
-            updateAppData({ projects: updatedProjects });
+            setAppData(prev => ({
+                ...prev,
+                projects: prev.projects.map(p => {
+                    if (p.id === data.targetProjectId) {
+                        const updatedProject = {
+                            ...p,
+                            planningDocument: data.documents.planningDocument,
+                            implementationPlan: data.documents.implementationPlan,
+                            scratchpad: data.documents.scratchpad,
+                        };
+                        const newTasks = parseImplementationPlan(updatedProject.implementationPlan);
+                        updatedProject.tasks = newTasks;
+                        const { phaseColors, subPhaseColors } = assignColors(newTasks, p.phaseColors, p.subPhaseColors, p.theme || 'dark');
+                        updatedProject.phaseColors = phaseColors;
+                        updatedProject.subPhaseColors = subPhaseColors;
+                        return updatedProject;
+                    }
+                    return p;
+                })
+            }));
         }
-    };
+    }, [settings.applyThemeToAllProjects, settings.dashboardTheme]);
 
 
-    const handleTaskDrillDown = (task: Task, parentProjectId: string) => {
-        const existingSubProject = projects.find(p => p.id === task.subProjectId);
-        if (existingSubProject) {
-            setActiveProjectId(task.subProjectId);
+    const handleTaskDrillDown = useCallback((task: Task, parentProjectId: string) => {
+        const subProjectId = task.subProjectId;
+        
+        if (subProjectId && projects.some(p => p.id === subProjectId)) {
+            setActiveProjectId(subProjectId);
             return;
         }
-
+        
         const newSubProjectId = `proj-${Date.now()}`;
         const parentProject = projects.find(p => p.id === parentProjectId);
+
         const newSubProject: Project = {
             id: newSubProjectId,
             name: `Task: ${task.description}`,
@@ -2049,20 +2058,17 @@ const App: React.FC = () => {
         newSubProject.phaseColors = phaseColors;
         newSubProject.subPhaseColors = subPhaseColors;
         
-        const updatedTask = { ...task, subProjectId: newSubProjectId };
-        
-        const newProjects = [
-            ...projects.map(p => 
+        setAppData(prev => {
+            const updatedTask = { ...task, subProjectId: newSubProjectId };
+            const newProjects = prev.projects.map(p => 
                 p.id === parentProjectId 
                 ? { ...p, tasks: p.tasks.map(t => t.id === task.id ? updatedTask : t) } 
                 : p
-            ),
-            newSubProject
-        ];
-        
-        updateAppData({ projects: newProjects });
+            );
+            return { ...prev, projects: [...newProjects, newSubProject] };
+        });
         setActiveProjectId(newSubProjectId);
-    };
+    }, [projects]);
 
     if (activeProject) {
         return <ProjectView 
