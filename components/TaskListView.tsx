@@ -20,7 +20,70 @@ const getPriorityClass = (priority: Priority): string => {
   }
 };
 
-export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, project, comments, onTaskUpdate, onRightClick, onTaskDrillDown }) => {
+const ListHeader = () => (
+    <div className="flex-shrink-0 flex items-center px-4 py-3 text-xs text-secondary uppercase bg-tertiary border-b border-secondary sticky top-0 z-10 font-semibold">
+        <div className="w-24 flex-shrink-0 pr-4">ID</div>
+        <div className="flex-1 min-w-0 pr-4">Description</div>
+        <div className="w-36 flex-shrink-0 pr-4">Status</div>
+        <div className="w-28 flex-shrink-0 pr-4">Priority</div>
+        <div className="w-48 flex-shrink-0 pr-4">Phase / Sub-Phase</div>
+        <div className="w-20 flex-shrink-0 text-center">Comments</div>
+    </div>
+);
+
+const TaskRow: React.FC<Omit<TaskListViewProps, 'tasks' | 'project'> & { task: Task, comments: Comment[], phaseColor: string }> = ({ task, comments, onTaskUpdate, onRightClick, onTaskDrillDown, phaseColor }) => {
+    const activeComments = comments.filter(c => c.status === CommentStatus.Active);
+    
+    return (
+        <div
+            onContextMenu={(e) => onRightClick(e, task)}
+            onDoubleClick={() => onTaskDrillDown(task)}
+            className="flex items-center border-b border-secondary hover:bg-hover cursor-pointer group text-sm"
+            style={{ borderLeft: `4px solid ${phaseColor}` }}
+        >
+            <div className="w-24 flex-shrink-0 px-4 py-3 font-mono text-secondary group-hover:text-primary truncate">{task.id}</div>
+            <div className="flex-1 min-w-0 pr-4 truncate" title={task.description}>{task.description}</div>
+            <div className="w-36 flex-shrink-0 pr-4">
+                 <select 
+                    value={task.status} 
+                    onChange={(e) => onTaskUpdate({ ...task, status: e.target.value as TaskStatus })}
+                    onClick={(e) => e.stopPropagation()} // Prevent row click when changing status
+                    className="w-full bg-primary border border-secondary rounded-md p-1.5 focus:ring-2 focus:ring-accent outline-none text-xs"
+                  >
+                    {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+            </div>
+            <div className="w-28 flex-shrink-0 pr-4">
+                  <select 
+                    value={task.priority} 
+                    onChange={(e) => onTaskUpdate({ ...task, priority: e.target.value as Priority })}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`w-full bg-primary border border-secondary rounded-md p-1.5 focus:ring-2 focus:ring-accent outline-none text-xs font-semibold ${getPriorityClass(task.priority)}`}
+                  >
+                    {Object.values(Priority).map(p => <option key={p} value={p} className="bg-primary text-primary">{p}</option>)}
+                  </select>
+            </div>
+            <div className="w-48 flex-shrink-0 pr-4 truncate">
+                <span className="font-semibold">{task.phase}</span>
+                <span className="text-secondary"> / {task.subPhase}</span>
+            </div>
+            <div className="w-20 flex-shrink-0 flex justify-center">
+                 {activeComments.length > 0 && (
+                    <div 
+                      className="flex items-center justify-center gap-1 text-xs text-secondary bg-tertiary px-2 py-1 rounded-full" 
+                      title={`${activeComments.length} active comment(s)`}
+                    >
+                      <CommentIndicatorIcon />
+                      <span>{activeComments.length}</span>
+                    </div>
+                  )}
+            </div>
+        </div>
+    );
+};
+
+
+export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, project, ...props }) => {
   if (tasks.length === 0) {
     return (
       <div className="flex-grow flex items-center justify-center bg-secondary/70 rounded-lg border border-secondary text-secondary">
@@ -30,73 +93,19 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, project, comm
   }
 
   return (
-    <div className="flex-grow overflow-y-auto bg-secondary/70 rounded-lg border border-secondary relative">
-      <table className="w-full text-sm text-left text-primary table-fixed">
-        <thead className="text-xs text-secondary uppercase bg-tertiary sticky top-0 z-10">
-          <tr>
-            <th scope="col" className="px-4 py-3 w-24">ID</th>
-            <th scope="col" className="px-4 py-3 w-2/5">Description</th>
-            <th scope="col" className="px-4 py-3 w-40">Status</th>
-            <th scope="col" className="px-4 py-3 w-32">Priority</th>
-            <th scope="col" className="px-4 py-3">Phase / Sub-Phase</th>
-            <th scope="col" className="px-4 py-3 w-20 text-center">Comments</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-secondary">
-          {tasks.map(task => {
-            const activeComments = comments.filter(c => c.taskId === task.id && c.status === CommentStatus.Active);
-            const phaseColor = project.phaseColors[task.phase] || 'var(--color-bg-tertiary)';
-
-            return (
-              <tr 
+    <div className="flex flex-col h-full bg-secondary/70 rounded-lg border border-secondary text-primary">
+      <ListHeader />
+      <div className="flex-grow overflow-y-auto">
+          {tasks.map(task => (
+            <TaskRow
                 key={task.id}
-                onContextMenu={(e) => onRightClick(e, task)}
-                onDoubleClick={() => onTaskDrillDown(task)}
-                className="hover:bg-hover cursor-pointer group"
-                style={{ borderLeft: `4px solid ${phaseColor}` }}
-              >
-                <td className="px-4 py-2 font-mono text-secondary group-hover:text-primary">{task.id}</td>
-                <td className="px-4 py-2 truncate">{task.description}</td>
-                <td className="px-4 py-2">
-                  <select 
-                    value={task.status} 
-                    onChange={(e) => onTaskUpdate({ ...task, status: e.target.value as TaskStatus })}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full bg-primary border border-secondary rounded-md p-1 focus:ring-2 focus:ring-accent outline-none text-xs"
-                  >
-                    {Object.values(TaskStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                   <select 
-                    value={task.priority} 
-                    onChange={(e) => onTaskUpdate({ ...task, priority: e.target.value as Priority })}
-                    onClick={(e) => e.stopPropagation()}
-                    className={`w-full bg-primary border border-secondary rounded-md p-1 focus:ring-2 focus:ring-accent outline-none text-xs font-semibold ${getPriorityClass(task.priority)}`}
-                  >
-                    {Object.values(Priority).map(p => <option key={p} value={p} className="bg-primary text-primary">{p}</option>)}
-                  </select>
-                </td>
-                <td className="px-4 py-2 truncate">
-                    <span className="font-semibold">{task.phase}</span>
-                    <span className="text-secondary"> / {task.subPhase}</span>
-                </td>
-                <td className="px-4 py-2">
-                  {activeComments.length > 0 && (
-                    <div 
-                      className="flex items-center justify-center gap-1 text-xs text-secondary bg-tertiary px-2 py-1 rounded-full" 
-                      title={`${activeComments.length} active comment(s)`}
-                    >
-                      <CommentIndicatorIcon />
-                      <span>{activeComments.length}</span>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                task={task}
+                comments={props.comments}
+                phaseColor={project.phaseColors[task.phase] || 'var(--color-bg-tertiary)'}
+                {...props}
+            />
+          ))}
+      </div>
     </div>
   );
 };

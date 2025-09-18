@@ -9,6 +9,13 @@ const markdownToHtml = (text: string): string => {
     const escapeHtml = (unsafe: string) => {
         return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
+    
+    const applyInlineFormatting = (str: string) => {
+        // Important: process bold (**) before italic (*) to avoid conflicts.
+        return escapeHtml(str)
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    };
 
     let inList = false;
     const lines = text.split('\n');
@@ -16,33 +23,50 @@ const markdownToHtml = (text: string): string => {
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const isListItem = line.trim().startsWith('- ');
+        const trimmedLine = line.trim();
+
+        // Close list if current line is not a list item and we are in a list
+        const isListItem = trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ');
         if (inList && !isListItem) {
             html += '</ul>';
             inList = false;
         }
-        if (!inList && isListItem) {
-            html += '<ul>';
-            inList = true;
+
+        // Headers
+        if (trimmedLine.startsWith('#')) {
+            const match = trimmedLine.match(/^(#{1,4})\s(.*)$/);
+            if (match) {
+                const level = match[1].length;
+                const content = match[2];
+                html += `<h${level}>${applyInlineFormatting(content)}</h${level}>`;
+                continue;
+            }
         }
-        let processedLine = escapeHtml(line).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
-        if (processedLine.trim().startsWith('## ')) {
-            html += `<h2>${processedLine.trim().substring(3)}</h2>`;
-        } else if (processedLine.trim().startsWith('# ')) {
-            html += `<h1>${processedLine.trim().substring(2)}</h1>`;
-        } else if (isListItem) {
-            html += `<li>${processedLine.trim().substring(2)}</li>`;
-        } else if (processedLine.trim() !== '') {
-            html += `<p>${processedLine}</p>`;
+        
+        // Unordered lists
+        if (isListItem) {
+            if (!inList) {
+                html += '<ul>';
+                inList = true;
+            }
+            html += `<li>${applyInlineFormatting(trimmedLine.substring(2))}</li>`;
+        } else if (trimmedLine !== '') {
+            // Paragraphs
+            html += `<p>${applyInlineFormatting(line)}</p>`;
         } else {
-            html += '<br />';
+            // Empty lines, but not inside a list
+            if (!inList) {
+               html += '<br />';
+            }
         }
     }
+
     if (inList) {
         html += '</ul>';
     }
     return html;
 };
+
 
 // Autocomplete and text processing helpers
 const generateNextTaskId = (subPhase: string, allTasks: Task[]): string | null => {
@@ -261,7 +285,7 @@ export const EditableDocumentPanel: React.FC<EditableDocumentPanelProps> = ({ ti
         />
       ) : (
         <div 
-          className="w-full flex-grow min-h-0 text-primary font-sans overflow-y-auto markdown-preview"
+          className="w-full flex-grow min-h-0 text-primary font-sans overflow-y-auto markdown-preview p-3"
           onContextMenu={onContextMenu}
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
         />
