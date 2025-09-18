@@ -29,9 +29,10 @@ interface KanbanCardProps {
   onRightClick: (e: React.MouseEvent<HTMLDivElement>, task: Task) => void;
   onDoubleClick: (task: Task) => void;
   onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
+  onTaskMove: (taskId: string, newStatus: TaskStatus) => void;
 }
 
-const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comments, onDragStart, onRightClick, onDoubleClick, onUpdateCommentStatus }) => {
+const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comments, onDragStart, onRightClick, onDoubleClick, onUpdateCommentStatus, onTaskMove }) => {
   const phaseColor = project.phaseColors[task.phase] || '#334155';
   const subPhaseColor = project.subPhaseColors[task.subPhase] || '#475569';
 
@@ -67,6 +68,19 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
   };
   
   const currentComment = activeComments[currentCommentIndex];
+  
+  const currentStatusIndex = KANBAN_COLUMNS.indexOf(task.status);
+  const canMoveLeft = currentStatusIndex > 0;
+  const canMoveRight = currentStatusIndex < KANBAN_COLUMNS.length - 1;
+
+  const handleMove = (e: React.MouseEvent, direction: 'left' | 'right') => {
+      e.stopPropagation(); // Prevent card's onDoubleClick/onRightClick
+      if (direction === 'left' && canMoveLeft) {
+          onTaskMove(task.id, KANBAN_COLUMNS[currentStatusIndex - 1]);
+      } else if (direction === 'right' && canMoveRight) {
+          onTaskMove(task.id, KANBAN_COLUMNS[currentStatusIndex + 1]);
+      }
+  };
 
   return (
     <div
@@ -83,7 +97,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
         style={cardStyle}
         data-task-id={task.id}
       >
-        <div className="bg-secondary p-3 rounded-md shadow-lg hover:bg-hover transition-colors relative">
+        <div className="bg-secondary p-3 rounded-md shadow-lg hover:bg-hover transition-colors relative group">
           <div className="flex justify-between items-start">
             <span className="text-sm font-bold text-primary break-words max-w-full">{task.description}</span>
           </div>
@@ -103,6 +117,25 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({ task, project, comment
                 </div>
               )}
           </div>
+           {/* Movement Buttons */}
+            <button
+              onClick={(e) => handleMove(e, 'left')}
+              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 p-1 bg-tertiary rounded-full shadow-lg opacity-0 group-hover:opacity-100 hover:bg-accent transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              title={`Move to ${KANBAN_COLUMNS[currentStatusIndex - 1]}`}
+              disabled={!canMoveLeft}
+              aria-label="Move task left"
+          >
+              <ChevronLeftIcon />
+          </button>
+          <button
+              onClick={(e) => handleMove(e, 'right')}
+              className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 p-1 bg-tertiary rounded-full shadow-lg opacity-0 group-hover:opacity-100 hover:bg-accent transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+              title={`Move to ${KANBAN_COLUMNS[currentStatusIndex + 1]}`}
+              disabled={!canMoveRight}
+              aria-label="Move task right"
+          >
+              <ChevronRightIcon />
+          </button>
         </div>
       </div>
 
@@ -166,9 +199,10 @@ interface KanbanColumnProps {
   onUpdateCommentStatus: (commentId: string, status: CommentStatus) => void;
   onAddNewTask: (status: TaskStatus) => void;
   onColumnRightClick: (e: React.MouseEvent<HTMLDivElement>, status: TaskStatus) => void;
+  onTaskMove: (taskId: string, newStatus: TaskStatus) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus, onAddNewTask, onColumnRightClick }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, comments, onDragStart, onRightClick, onDrop, onDoubleClick, onUpdateCommentStatus, onAddNewTask, onColumnRightClick, onTaskMove }) => {
   const [isOver, setIsOver] = React.useState(false);
   const isEmpty = tasks.length === 0;
 
@@ -229,6 +263,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, tasks, project, com
                 onRightClick={onRightClick}
                 onDoubleClick={onDoubleClick}
                 onUpdateCommentStatus={onUpdateCommentStatus}
+                onTaskMove={onTaskMove}
             />
             ))}
         </div>
@@ -279,6 +314,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, project, commen
             onUpdateCommentStatus={onUpdateCommentStatus}
             onAddNewTask={onAddNewTask}
             onColumnRightClick={onColumnRightClick}
+            onTaskMove={onTaskMove}
             {...rest}
           />
           {index < KANBAN_COLUMNS.length - 1 && (

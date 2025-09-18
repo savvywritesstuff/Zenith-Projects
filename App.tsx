@@ -11,7 +11,7 @@ import { EditableDocumentPanel, implementationPlanHelpText } from './components/
 import CommentsView from './components/CommentsView';
 import Tutorial from './components/Tutorial';
 import { FontPreviewer } from './components/FontPreviewer';
-import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, NewTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon, ProjectProgressBar, FolderIcon, AddFolderIcon, GridViewIcon, ListViewIcon, CompletedStamp, Confetti, SearchIcon, FilterIcon, ChevronDownIcon, XIcon } from './components/UI';
+import { ProgressBar, ContextMenu, Modal, EditTaskForm, EditIcon, TrashIcon, PlusIcon, ImplementTaskForm, NewTaskForm, InfoTooltip, HelpIcon, HelpDocumentation, ArchiveIcon, UploadIcon, SettingsIcon, CommentIcon, AddCommentIcon, BackupAllIcon, RestoreIcon, RemoveAllCommentsIcon, ProjectProgressBar, FolderIcon, AddFolderIcon, GridViewIcon, ListViewIcon, CompletedStamp, Confetti, SearchIcon, FilterIcon, ChevronDownIcon, XIcon, FullScreenIcon, ExitFullScreenIcon } from './components/UI';
 import { getInitialData, parseImplementationPlan, generateImplementationPlanText, assignColors } from './services/projectService';
 import { AppData, saveDataToCookie, loadDataFromCookie, saveSettingsToLocalStorage, loadSettingsFromLocalStorage } from './services/storageService';
 
@@ -136,6 +136,7 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
     const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
     const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
     const [taskView, setTaskView] = useState<'board' | 'list'>('board');
+    const [isKanbanFullScreen, setIsKanbanFullScreen] = useState(false);
 
     // Filter states
     const [selectedPhases, setSelectedPhases] = useState<string[]>([]);
@@ -182,6 +183,20 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
             updateProject({ ...project, completionNotified: true });
         }
     }, [project.tasks, project.completionNotified, isReadOnly, updateProject, project]);
+    
+     useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+          if (event.key === 'Escape' && isKanbanFullScreen) {
+            setIsKanbanFullScreen(false);
+          }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isKanbanFullScreen]);
 
     const tutorialSteps = useMemo<TutorialStep[]>(() => [
         {
@@ -748,6 +763,15 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                             >
                                 <ListViewIcon />
                             </button>
+                            {taskView === 'board' && (
+                                <button
+                                    onClick={() => setIsKanbanFullScreen(true)}
+                                    title="Fullscreen Board"
+                                    className="p-1.5 rounded-md text-secondary hover:text-primary hover:bg-hover transition-colors"
+                                >
+                                    <FullScreenIcon />
+                                </button>
+                            )}
                         </div>
                     )}
                     <div className="flex-grow min-h-0">
@@ -915,6 +939,35 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, allProjects, updateP
                     </div>
                 )}
             </Modal>
+            {isKanbanFullScreen && (
+                <div className="fixed inset-0 bg-primary z-50 p-4 flex flex-col animate-fade-in-up">
+                    <div className="flex-shrink-0 flex items-center justify-between mb-2">
+                        <h2 className="text-xl font-bold text-primary">{project.name} - Board</h2>
+                         <button
+                            onClick={() => setIsKanbanFullScreen(false)}
+                            title="Exit Fullscreen"
+                            className="p-1.5 rounded-md text-secondary hover:text-primary hover:bg-hover transition-colors"
+                        >
+                            <ExitFullScreenIcon />
+                        </button>
+                    </div>
+                    <div className="flex-grow min-h-0 flex items-center justify-center">
+                        <KanbanBoard
+                            tasks={filteredTasks}
+                            project={project}
+                            comments={project.comments}
+                            onTaskUpdate={handleTaskUpdate}
+                            onTaskDelete={handleTaskDelete}
+                            onTaskMove={handleTaskMove}
+                            onRightClick={handleTaskRightClick}
+                            onTaskDrillDown={onTaskDrillDown}
+                            onUpdateCommentStatus={handleUpdateCommentStatus}
+                            onAddNewTask={handleOpenAddTaskModal}
+                            onColumnRightClick={handleColumnRightClick}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
